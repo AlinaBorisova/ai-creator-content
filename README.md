@@ -26,7 +26,7 @@
 1.  **Клонируйте репозиторий:**
     ```bash
     git clone https://github.com/AlinaBorisova/ai-creator-content.git
-    cd tg-parser
+    cd ai-creator-content
     ```
 
 2.  **Установите зависимости:**
