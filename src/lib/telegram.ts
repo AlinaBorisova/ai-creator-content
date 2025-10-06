@@ -1,5 +1,6 @@
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
+import { CustomFile } from 'telegram/client/uploads';
 import input from 'input';
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID || '0');
@@ -71,4 +72,66 @@ export async function getMessages(channelIdString: string): Promise<PostData[]> 
   await client.disconnect();
 
   return messages;
+}
+
+// ==========================================================
+// ФУНКЦИЯ ДЛЯ ОТПРАВКИ ПОСТА
+// ==========================================================
+export async function sendPostToChannel(channelIdString: string, text: string, imageBase64: string): Promise<void> {
+  if (!channelIdString) throw new Error('Channel ID cannot be empty for sending.');
+  const channelId = parseInt(channelIdString);
+  if (isNaN(channelId)) throw new Error('Invalid Channel ID for sending.');
+  if (!imageBase64) throw new Error('Image is required for sending a post.');
+
+  console.log('[Telegram] Подключение к клиенту для отправки поста...');
+  await client.connect();
+  console.log('[Telegram] Клиент для отправки подключен.');
+
+  try {
+    const channel = await client.getEntity(channelId) as any;
+    const base64Data = imageBase64.split(',')[1];
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    const imageFile = new CustomFile('image.jpg', imageBuffer.length, '', imageBuffer);
+
+    // Определяем лимит для подписи
+    const CAPTION_LIMIT = 1024;
+
+    console.log(`[Telegram] Отправка поста в канал "${channel.title}"...`);
+
+    // Проверяем длину текста
+    if (text.length > CAPTION_LIMIT) {
+      console.log('[Telegram] Текст слишком длинный, будет разделен на два сообщения.');
+
+      // Разделяем текст
+      const caption = text.substring(0, CAPTION_LIMIT);
+      const followUpMessage = text.substring(CAPTION_LIMIT);
+
+      // 1. Отправляем картинку с первой частью текста
+      await client.sendMessage(channel, {
+        message: caption,
+        file: imageFile,
+      });
+
+      // 2. Отправляем остаток текста отдельным сообщением
+      await client.sendMessage(channel, {
+        message: followUpMessage,
+      });
+
+    } else {
+      // Если текст в пределах лимита, отправляем как обычно
+      await client.sendMessage(channel, {
+        message: text,
+        file: imageFile,
+      });
+    }
+
+    console.log('[Telegram] Пост успешно отправлен!');
+
+  } catch (error) {
+    console.error('[Telegram] Ошибка при отправке поста:', error);
+    throw error;
+  } finally {
+    console.log('[Telegram] Отключение клиента после отправки.');
+    await client.disconnect();
+  }
 }

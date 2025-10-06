@@ -1,6 +1,6 @@
 'use server';
 
-import { getMessages } from '@/lib/telegram';
+import { getMessages, sendPostToChannel } from '@/lib/telegram';
 import { rewriteTextWithYandexGPT } from '@/lib/yandex-text';
 import { generateImageWithYandexArt } from '@/lib/yandex-image';
 import { extractPrompt, cleanTextForAI } from '@/lib/utils';
@@ -51,5 +51,18 @@ export async function generateImageAction(prompt: string) {
     return { data: imageUrl };
   } catch (error: any) {
     return { error: error.message || 'Failed to generate image.' };
+  }
+}
+
+export async function sendPostAction(channelId: string, text: string, imageBase64: string) {
+  try {
+    // Вызываем нашу новую функцию из telegram.ts
+    await sendPostToChannel(channelId, text, imageBase64);
+    // Возвращаем успешный результат
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Action Error] Failed to send post:', error);
+    // Возвращаем ошибку, чтобы показать ее в интерфейсе
+    return { error: error.message || 'An unknown error occurred while sending the post.' };
   }
 }
