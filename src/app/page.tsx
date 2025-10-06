@@ -1,5 +1,3 @@
-// src/app/page.tsx
-
 import { MessageFetcher } from "@/app/components/MessageFetcher";
 
 export default function HomePage() {
@@ -9,7 +7,7 @@ export default function HomePage() {
         <header className="mb-8">
           <h1 className="text-4xl font-bold text-center">TG Parser</h1>
           <p className="text-center text-gray-400 mt-2">
-            Получение сообщений из Telegram-канала за последнюю неделю
+            Анализ и улучшение постов из Telegram-канала за последнюю неделю
           </p>
         </header>
 

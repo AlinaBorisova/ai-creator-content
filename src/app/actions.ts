@@ -1,40 +1,55 @@
-"use server";
+'use server';
 
-import { getMessagesFromChannel } from "@/lib/telegram";
-import { getAiAnalysis } from '@/lib/yandex';
+import { getMessages } from '@/lib/telegram';
+import { rewriteTextWithYandexGPT } from '@/lib/yandex-text';
+import { generateImageWithYandexArt } from '@/lib/yandex-image';
+import { extractPrompt, cleanTextForAI } from '@/lib/utils';
 
-// Экспортная функция, которую будем вызывать из формы
-export async function fetchChannelMessagesAction(formData: FormData) {
-  const channelUsername = formData.get('channelUsername') as string;
-
-  // Простая валидация
-  if (!channelUsername || channelUsername.trim() === '') {
-    return { messages: [], error: 'Название канала не может быть пустым.' };
-  }
-
-  console.log(`[Server Action] Получен запрос для канала: ${channelUsername}`);
-
+export async function getTelegramMessagesAction(channelId: string) {
   try {
-    // Мы вызываем функцию из lib
-    const messages = await getMessagesFromChannel(channelUsername);
-    return { messages, error: null };
-  } catch (error) {
-    console.error('[Server Action] Ошибка при получении сообщений:', error);
-    return { messages: [], error: 'Произошла ошибка на сервере. Возможно, неверное имя канала или проблема с API.' };
+    // 1. Получаем посты с реакциями
+    const messagesWithReactions = await getMessages(channelId);
+
+    // 2. Сортируем массив по убыванию количества реакций
+    messagesWithReactions.sort((a, b) => b.reactions - a.reactions);
+
+    // 3. Применяем очистку к тексту каждого поста уже после сортировки
+    const cleanedAndSortedMessages = messagesWithReactions.map(post => ({
+      ...post,
+      text: cleanTextForAI(post.text),
+    }));
+
+    // 4. Возвращаем отсортированные и очищенные данные
+    return { data: cleanedAndSortedMessages };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to fetch messages.' };
   }
 }
 
-export async function analyzePostAction(postText: string) {
-  'use server';
+export async function rewriteTextAction(text: string) {
   try {
-    const analysis = await getAiAnalysis(postText);
-    return { analysis };
-  } catch (error) {
-    // Приводим ошибку к стандартному виду для передачи на клиент
-    if (error instanceof Error) {
-      return { error: error.message };
+    // 1. Сначала очищаем текст от мусора
+    const cleanedTextForAI = cleanTextForAI(text);
+
+    // 2. Отправляем в YandexGPT уже очищенный текст
+    const fullText = await rewriteTextWithYandexGPT(cleanedTextForAI);
+
+    const prompt = extractPrompt(fullText);
+    const cleanText = fullText.replace(/<prompt>.*?<\/prompt>/s, '').trim();
+    return { data: { cleanText, prompt } };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to rewrite text.' };
+  }
+}
+
+export async function generateImageAction(prompt: string) {
+  try {
+    if (!prompt || prompt === 'no prompt') {
+      return { error: 'Prompt is empty or invalid. Cannot generate image.' };
     }
-    return { error: 'Произошла неизвестная ошибка при анализе' };
+    const imageUrl = await generateImageWithYandexArt(prompt);
+    return { data: imageUrl };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to generate image.' };
   }
 }
-
