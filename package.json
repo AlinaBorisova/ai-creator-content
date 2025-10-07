@@ -1,10 +1,10 @@
 {
-  "name": "tg-parser",
+  "name": "ai-creator-content",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --turbopack",
+    "build": "prisma db push && next build --turbopack",
     "start": "next start",
     "lint": "eslint"
   },
