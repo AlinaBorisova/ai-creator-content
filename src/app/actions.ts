@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { getMessages, sendPostToChannel } from '@/lib/telegram';
 import { rewriteTextWithYandexGPT } from '@/lib/yandex-text';
 import { generateImageWithYandexArt } from '@/lib/yandex-image';
@@ -21,8 +22,8 @@ export async function getTelegramMessagesAction(channelId: string) {
 
     // 4. Возвращаем отсортированные и очищенные данные
     return { data: cleanedAndSortedMessages };
-  } catch (error: any) {
-    return { error: error.message || 'Failed to fetch messages.' };
+  } catch (error: unknown) {
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred' };
   }
 }
 
@@ -37,8 +38,8 @@ export async function rewriteTextAction(text: string) {
     const prompt = extractPrompt(fullText);
     const cleanText = fullText.replace(/<prompt>.*?<\/prompt>/s, '').trim();
     return { data: { cleanText, prompt } };
-  } catch (error: any) {
-    return { error: error.message || 'Failed to rewrite text.' };
+  } catch (error: unknown) {
+    return { error: error instanceof Error ? error.message : 'Failed to rewrite text.' };
   }
 }
 
@@ -47,22 +48,25 @@ export async function generateImageAction(prompt: string) {
     if (!prompt || prompt === 'no prompt') {
       return { error: 'Prompt is empty or invalid. Cannot generate image.' };
     }
-    const imageUrl = await generateImageWithYandexArt(prompt);
-    return { data: imageUrl };
-  } catch (error: any) {
-    return { error: error.message || 'Failed to generate image.' };
+    const imageUrls = await generateImageWithYandexArt(prompt);
+    revalidatePath('/');
+    //const imageUrl = await generateImageWithYandexArt(prompt);
+    return { data: imageUrls };
+  } catch (error: unknown) {
+    console.error('[Action Error]', error);
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred' };
   }
 }
 
 export async function sendPostAction(channelId: string, text: string, imageBase64: string) {
   try {
-    // Вызываем нашу новую функцию из telegram.ts
+    // Вызываем функцию из telegram.ts
     await sendPostToChannel(channelId, text, imageBase64);
     // Возвращаем успешный результат
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Action Error] Failed to send post:', error);
     // Возвращаем ошибку, чтобы показать ее в интерфейсе
-    return { error: error.message || 'An unknown error occurred while sending the post.' };
+    return { error: error instanceof Error ? error.message : 'An unknown error occurred while sending the post.' };
   }
 }
