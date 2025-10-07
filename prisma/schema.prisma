@@ -1,0 +1,29 @@
+// Этот блок говорит Prisma, как генерировать клиент для работы с БД
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Этот блок указывает, что мы используем PostgreSQL и где взять URL для подключения
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_URL") // Используем переменную, которую создает Vercel
+}
+
+// Описываем нашу главную таблицу - "User"
+model User {
+  id            String   @id @default(cuid()) // Уникальный ID пользователя в нашей системе
+  telegramId    BigInt   @unique              // Уникальный ID пользователя из Telegram
+  firstName     String                        // Имя пользователя из Telegram
+  username      String?                       // @username пользователя (может отсутствовать)
+  photoUrl      String?                       // Ссылка на аватар пользователя
+
+  // --- Ключевые поля для нашего приложения ---
+  // Здесь будет храниться ЗАШИФРОВАННАЯ сессия для чтения каналов
+  stringSession String?
+  // Здесь будет храниться ЗАШИФРОВАННЫЙ токен бота для постинга
+  botToken      String?
+
+  // Служебные поля для отслеживания дат
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
