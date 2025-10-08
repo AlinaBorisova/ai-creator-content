@@ -17,8 +17,6 @@ interface TelegramUser {
 }
 
 // РАСШИРЯЕМ ГЛОБАЛЬНЫЙ ТИП WINDOW
-// Это "правильный" способ сообщить TypeScript, что у объекта window
-// теперь есть наше кастомное свойство onTelegramAuth.
 declare global {
   interface Window {
     onTelegramAuth: (user: TelegramUser) => void;
@@ -26,27 +24,48 @@ declare global {
 }
 
 export default function TelegramLoginWidget() {
-  // Этот эффект гарантирует, что наша функция-обработчик будет доступна глобально,
-  // когда скрипт Telegram ее вызовет.
+  // МАЯЧОК №1: Проверяем, что переменная окружения доступна на клиенте.
+  // Если здесь будет 'undefined', то виджет не будет работать.
+  console.log(
+    'Widget is rendering. Bot name from env:',
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME
+  );
+
   useEffect(() => {
-    // Теперь мы можем обращаться к window.onTelegramAuth напрямую, без "(as any)"
+    // МАЯЧОК №2: Убеждаемся, что наш хук запускается и функция назначается.
+    console.log('useEffect running. Setting up window.onTelegramAuth...');
+
     window.onTelegramAuth = (user: TelegramUser) => {
+      // МАЯЧОК №3: САМЫЙ ВАЖНЫЙ. Если мы видим это сообщение, значит Telegram
+      // успешно авторизовал пользователя и вызвал нашу функцию.
+      console.log('SUCCESS! onTelegramAuth was called by Telegram. User data:', user);
+
       // Когда пользователь авторизовался, мы вызываем signIn с нашими данными
       signIn('telegram-widget', {
         ...user,
         redirect: false, // Отключаем автоматический редирект от NextAuth
-      }).then((result) => {
-        // После успешного входа вручную перезагружаем страницу, чтобы обновить сессию
-        if (result && !result.error) {
-          window.location.href = '/';
-        }
-      });
+      })
+        .then((result) => {
+          // МАЯЧОК №4: Смотрим, что ответил NextAuth после попытки входа.
+          console.log('NextAuth signIn result:', result);
+
+          // После успешного входа вручную перезагружаем страницу, чтобы обновить сессию
+          if (result && !result.error) {
+            console.log('Login successful, redirecting to /');
+            window.location.href = '/';
+          } else {
+            // Если есть ошибка от NextAuth, выводим ее.
+            console.error('NextAuth signIn failed:', result?.error);
+          }
+        })
+        .catch((error) => {
+          // МАЯЧОК №5: Ловим любые непредвиденные ошибки в процессе signIn.
+          console.error('An unexpected error occurred during signIn:', error);
+        });
     };
   }, []);
 
   return (
-    // Это единственный скрипт, который нам нужен. Он сам найдет этот div
-    // и вставит в него кнопку.
     <div id="telegram-login-container">
       <Script
         async
