@@ -1,3 +1,4 @@
+// src/app/components/TelegramLoginWidget.tsx
 'use client';
 
 import { signIn } from 'next-auth/react';
@@ -15,11 +16,21 @@ interface TelegramUser {
   hash: string;
 }
 
+// РАСШИРЯЕМ ГЛОБАЛЬНЫЙ ТИП WINDOW
+// Это "правильный" способ сообщить TypeScript, что у объекта window
+// теперь есть наше кастомное свойство onTelegramAuth.
+declare global {
+  interface Window {
+    onTelegramAuth: (user: TelegramUser) => void;
+  }
+}
+
 export default function TelegramLoginWidget() {
   // Этот эффект гарантирует, что наша функция-обработчик будет доступна глобально,
   // когда скрипт Telegram ее вызовет.
   useEffect(() => {
-    (window as any).onTelegramAuth = (user: TelegramUser) => {
+    // Теперь мы можем обращаться к window.onTelegramAuth напрямую, без "(as any)"
+    window.onTelegramAuth = (user: TelegramUser) => {
       // Когда пользователь авторизовался, мы вызываем signIn с нашими данными
       signIn('telegram-widget', {
         ...user,

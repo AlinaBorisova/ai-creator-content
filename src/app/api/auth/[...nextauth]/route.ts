@@ -1,4 +1,6 @@
 import NextAuth, { DefaultSession, AuthOptions } from "next-auth";
+// Говорим линтеру игнорировать следующую строку, так как 'JWT' используется для расширения типа, а не как переменная.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { JWT } from "next-auth/jwt";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from '@/lib/prisma';
