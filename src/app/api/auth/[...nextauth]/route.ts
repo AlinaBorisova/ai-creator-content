@@ -1,4 +1,4 @@
-// src/app/api/auth/[...nextauth]/route.ts
+// src/app/api/auth/[...nextauth]/route.ts (ФИНАЛЬНАЯ ВЕРСИЯ)
 import NextAuth, { DefaultSession, AuthOptions } from "next-auth";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { JWT } from "next-auth/jwt";
@@ -40,28 +40,33 @@ export const authOptions: AuthOptions = {
       credentials: {},
 
       async authorize(credentials) {
-        const userData = credentials as TelegramUser;
+        const userData = credentials as Partial<TelegramUser>; // Используем Partial для большей безопасности
 
         if (!userData || !userData.hash || !process.env.TELEGRAM_BOT_TOKEN) {
           console.error("Authorize error: Missing user data or bot token.");
           return null;
         }
 
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
         const { hash, ...dataToCheck } = userData;
 
-        // --- НАЧАЛО ДИАГНОСТИЧЕСКОГО БЛОКА ---
-        const botToken = process.env.TELEGRAM_BOT_TOKEN;
-        const botIdFromToken = botToken.split(':')[0];
-        console.log(`[DIAGNOSTIC LOG] Server is using token for Bot ID: ${botIdFromToken}`);
-        // --- КОНЕЦ ДИАГНОСТИЧЕСКОГО БЛОКА ---
-
-        const checkString = (Object.keys(dataToCheck) as Array<keyof typeof dataToCheck>)
+        // =================================================================
+        // Фильтруем ключи, чтобы исключить
+        // любые поля со значением `undefined`, идеально повторяя логику Telegram.
+        // =================================================================
+        const checkString = Object.keys(dataToCheck)
+          .filter((key) => dataToCheck[key as keyof typeof dataToCheck] !== undefined) // <-- ВОТ ОНО, РЕШЕНИЕ
           .sort()
-          .map(key => (`${key}=${dataToCheck[key]}`))
+          .map((key) => (`${key}=${dataToCheck[key as keyof typeof dataToCheck]}`))
           .join('\n');
 
+        // Диагностика для сравнения
+        console.log("--- Data Check String ---");
+        console.log(checkString);
+        console.log("-------------------------");
+
         const secretKey = crypto.createHash('sha256')
-          .update(process.env.TELEGRAM_BOT_TOKEN)
+          .update(botToken)
           .digest();
 
         const hmac = crypto.createHmac('sha256', secretKey)
@@ -70,36 +75,39 @@ export const authOptions: AuthOptions = {
 
         if (hmac !== hash) {
           console.error("Authorize error: Invalid hash. Data might be forged.");
+          console.log(`Expected hash: ${hmac}`);
+          console.log(`Received hash: ${hash}`);
           return null;
         }
 
-        const authDate = new Date(userData.auth_date * 1000);
-        const now = new Date();
-        if (now.getTime() - authDate.getTime() > 86400000) {
-          console.error("Authorize error: Auth data is outdated.");
-          return null;
+        // Проверка на устаревание данных
+        if (userData.auth_date) {
+          const authDate = new Date(userData.auth_date * 1000);
+          const now = new Date();
+          if (now.getTime() - authDate.getTime() > 86400000) { // 24 часа
+            console.error("Authorize error: Auth data is outdated.");
+            return null;
+          }
         }
 
-        const telegramId = userData.id.toString();
+        const telegramId = userData.id!.toString();
 
         try {
-          const user = await prisma.user.findUnique({
+          // Ищем или создаем пользователя
+          const user = await prisma.user.upsert({
             where: { id: telegramId },
-          });
-
-          if (user) {
-            return user;
-          }
-
-          const newUser = await prisma.user.create({
-            data: {
+            update: { // Обновляем данные, если пользователь уже существует
+              name: [userData.first_name, userData.last_name].filter(Boolean).join(" "),
+              image: userData.photo_url,
+            },
+            create: { // Создаем, если его нет
               id: telegramId,
               name: [userData.first_name, userData.last_name].filter(Boolean).join(" "),
               image: userData.photo_url,
-              email: null,
+              email: null, // email не предоставляется
             },
           });
-          return newUser;
+          return user;
 
         } catch (error) {
           console.error("Error during DB operation in authorize:", error);
@@ -131,4 +139,3 @@ export const authOptions: AuthOptions = {
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
-
