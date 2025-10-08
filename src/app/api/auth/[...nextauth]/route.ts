@@ -1,8 +1,18 @@
 import NextAuth, { DefaultSession, AuthOptions } from "next-auth";
-import { JWT } from "next-auth/jwt";
+import type { JWT } from "next-auth/jwt";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from '@/lib/prisma';
 import CredentialsProvider from "next-auth/providers/credentials";
+
+export interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
 
 /**
  * Расширяем стандартные типы NextAuth, чтобы добавить `id` пользователя
@@ -46,14 +56,15 @@ export const authOptions: AuthOptions = {
        * Функция authorize - это сердце нашего "ручного" входа.
        * Она получает данные, которые мы передали из фронтенда в `signIn()`.
        */
-      async authorize(credentials: any) {
+      async authorize(credentials) {
+        const userData = credentials as TelegramUser;
+
         // Убедимся, что данные от виджета вообще пришли
-        if (!credentials || !credentials.id) {
+        if (!userData || !userData.id) {
           console.error("Authorize error: No credentials received from widget.");
           return null; // Отклоняем аутентификацию
         }
 
-        const userData = credentials;
         const telegramId = userData.id.toString(); // ID из Telegram приходит как число, в БД храним как строку
 
         try {
