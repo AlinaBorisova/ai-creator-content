@@ -49,9 +49,12 @@ export const authOptions: AuthOptions = {
 
         const { hash, ...dataToCheck } = userData;
 
-        // =================================================================
-        // ИСПРАВЛЕННАЯ И ТИПОБЕЗОПАСНАЯ ВЕРСИЯ ПРОВЕРКИ
-        // =================================================================
+        // --- НАЧАЛО ДИАГНОСТИЧЕСКОГО БЛОКА ---
+        const botToken = process.env.TELEGRAM_BOT_TOKEN;
+        const botIdFromToken = botToken.split(':')[0];
+        console.log(`[DIAGNOSTIC LOG] Server is using token for Bot ID: ${botIdFromToken}`);
+        // --- КОНЕЦ ДИАГНОСТИЧЕСКОГО БЛОКА ---
+
         const checkString = (Object.keys(dataToCheck) as Array<keyof typeof dataToCheck>)
           .sort()
           .map(key => (`${key}=${dataToCheck[key]}`))
