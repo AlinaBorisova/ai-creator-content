@@ -1,7 +1,5 @@
-// src/app/api/auth/[...nextauth]/route.ts (ФИНАЛЬНАЯ ВЕРСИЯ)
+// src/app/api/auth/[...nextauth]/route.ts
 import NextAuth, { DefaultSession, AuthOptions } from "next-auth";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import type { JWT } from "next-auth/jwt";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from '@/lib/prisma';
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -40,30 +38,37 @@ export const authOptions: AuthOptions = {
       credentials: {},
 
       async authorize(credentials) {
-        const userData = credentials as Partial<TelegramUser>; // Используем Partial для большей безопасности
+        const allData = credentials as Record<string, string | number>;
 
-        if (!userData || !userData.hash || !process.env.TELEGRAM_BOT_TOKEN) {
-          console.error("Authorize error: Missing user data or bot token.");
+        if (!allData || !allData.hash || !process.env.TELEGRAM_BOT_TOKEN) {
+          console.error("Authorize error: Missing data or bot token.");
           return null;
         }
 
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
-        const { hash, ...dataToCheck } = userData;
+        const hash = allData.hash;
 
         // =================================================================
-        // Фильтруем ключи, чтобы исключить
-        // любые поля со значением `undefined`, идеально повторяя логику Telegram.
+        // Создаем строку ТОЛЬКО из известных полей Telegram,
+        // полностью игнорируя служебные поля от NextAuth.
         // =================================================================
-        const checkString = Object.keys(dataToCheck)
-          .filter((key) => dataToCheck[key as keyof typeof dataToCheck] !== undefined) // <-- ВОТ ОНО, РЕШЕНИЕ
+        const telegramKeys = [
+          'id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date'
+        ];
+
+        const checkString = telegramKeys
+          // Берем только те ключи из нашего списка, которые реально есть в данных
+          .filter(key => allData[key] !== undefined && allData[key] !== null)
+          // Создаем из них строки "ключ=значение"
+          .map(key => `${key}=${allData[key]}`)
+          // Сортируем и объединяем
           .sort()
-          .map((key) => (`${key}=${dataToCheck[key as keyof typeof dataToCheck]}`))
           .join('\n');
 
         // Диагностика для сравнения
-        console.log("--- Data Check String ---");
+        console.log("--- CLEAN Data Check String ---");
         console.log(checkString);
-        console.log("-------------------------");
+        console.log("-------------------------------");
 
         const secretKey = crypto.createHash('sha256')
           .update(botToken)
@@ -80,6 +85,9 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
+        // Теперь, когда проверка пройдена, мы можем безопасно работать с данными как с TelegramUser
+        const userData = allData as unknown as TelegramUser;
+
         // Проверка на устаревание данных
         if (userData.auth_date) {
           const authDate = new Date(userData.auth_date * 1000);
@@ -90,23 +98,24 @@ export const authOptions: AuthOptions = {
           }
         }
 
-        const telegramId = userData.id!.toString();
+        const telegramId = userData.id.toString();
 
         try {
           // Ищем или создаем пользователя
           const user = await prisma.user.upsert({
             where: { id: telegramId },
-            update: { // Обновляем данные, если пользователь уже существует
+            update: {
               name: [userData.first_name, userData.last_name].filter(Boolean).join(" "),
               image: userData.photo_url,
             },
-            create: { // Создаем, если его нет
+            create: {
               id: telegramId,
               name: [userData.first_name, userData.last_name].filter(Boolean).join(" "),
               image: userData.photo_url,
-              email: null, // email не предоставляется
+              email: null,
             },
           });
+          console.log("SUCCESS! User authorized:", user.name);
           return user;
 
         } catch (error) {
