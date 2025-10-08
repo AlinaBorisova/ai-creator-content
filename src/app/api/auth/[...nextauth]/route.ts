@@ -49,23 +49,20 @@ export const authOptions: AuthOptions = {
         const hash = allData.hash;
 
         // =================================================================
-        // Создаем строку ТОЛЬКО из известных полей Telegram,
-        // полностью игнорируя служебные поля от NextAuth.
+        // ФИНАЛЬНОЕ РЕШЕНИЕ: Мы создаем строку ТОЛЬКО из известных полей Telegram,
+        // полностью игнорируя служебные поля от NextAuth (`csrfToken` и др.)
         // =================================================================
         const telegramKeys = [
           'id', 'first_name', 'last_name', 'username', 'photo_url', 'auth_date'
         ];
 
         const checkString = telegramKeys
-          // Берем только те ключи из нашего списка, которые реально есть в данных
           .filter(key => allData[key] !== undefined && allData[key] !== null)
-          // Создаем из них строки "ключ=значение"
           .map(key => `${key}=${allData[key]}`)
-          // Сортируем и объединяем
           .sort()
           .join('\n');
 
-        // Диагностика для сравнения
+        // Диагностика для проверки
         console.log("--- CLEAN Data Check String ---");
         console.log(checkString);
         console.log("-------------------------------");
@@ -85,14 +82,12 @@ export const authOptions: AuthOptions = {
           return null;
         }
 
-        // Теперь, когда проверка пройдена, мы можем безопасно работать с данными как с TelegramUser
         const userData = allData as unknown as TelegramUser;
 
-        // Проверка на устаревание данных
         if (userData.auth_date) {
           const authDate = new Date(userData.auth_date * 1000);
           const now = new Date();
-          if (now.getTime() - authDate.getTime() > 86400000) { // 24 часа
+          if (now.getTime() - authDate.getTime() > 86400000) {
             console.error("Authorize error: Auth data is outdated.");
             return null;
           }
@@ -101,7 +96,6 @@ export const authOptions: AuthOptions = {
         const telegramId = userData.id.toString();
 
         try {
-          // Ищем или создаем пользователя
           const user = await prisma.user.upsert({
             where: { id: telegramId },
             update: {
