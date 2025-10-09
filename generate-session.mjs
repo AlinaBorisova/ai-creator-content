@@ -1,7 +1,8 @@
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js'; // Важно указать .js в конце для некоторых версий
 import input from 'input';
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID, 10);
 const apiHash = process.env.TELEGRAM_API_HASH;
