@@ -21,13 +21,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'avatars.mds.yandex.net', // Хост из вашей ошибки
-        port: '',
-        pathname: '/**', // Разрешаем любые пути на этом хосте
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com', // Старый хост, добавляем на всякий случай
+        hostname: 'gen-api.storage.yandexcloud.net',
         port: '',
         pathname: '/**',
       },

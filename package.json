@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname localhost.com",
+    "dev": "next dev",
     "build": "prisma db push && next build --turbopack",
     "start": "next start",
     "lint": "eslint"

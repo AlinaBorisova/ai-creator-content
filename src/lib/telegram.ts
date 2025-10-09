@@ -102,65 +102,62 @@ export async function getMessages(channelIdString: string): Promise<PostData[]> 
  * @returns {Promise<void>} - Промис, который разрешается после успешной отправки поста.
  * @throws {Error} - Выбрасывает ошибку при возникновении проблем с отправкой.
  */
-export async function sendPostToChannel(
-  channelIdString: string,
-  text: string,
-  imageBase64: string
-): Promise<void> {
-  if (!channelIdString) throw new Error('Channel ID cannot be empty for sending.');
-  const channelId = parseInt(channelIdString);
-  if (isNaN(channelId)) throw new Error('Invalid Channel ID for sending.');
-  if (!imageBase64) throw new Error('Image is required for sending a post.');
-
+export async function sendPostToChannel(channelId: string, text: string, imageSource: string) {
   console.log('[Telegram] Подключение к клиенту для отправки поста...');
   await client.connect();
   console.log('[Telegram] Клиент для отправки подключен.');
 
   try {
-    const channel = (await client.getEntity(channelId)) as Api.Channel;
+    const entity = await client.getInputEntity(channelId);
+    let imageBuffer: Buffer;
 
-    // Подготавливаем изображение для отправки: извлекаем данные из Base64 и создаем буфер.
-    const base64Data = imageBase64.split(',')[1];
-    const imageBuffer = Buffer.from(base64Data, 'base64');
+    // --- НАШЕ ИЗМЕНЕНИЕ: Умная обработка изображения ---
+    if (imageSource.startsWith('data:image')) {
+      // Сценарий 1: Это старый формат Base64
+      console.log('[Telegram] Обнаружен формат Base64. Обрабатываем...');
+      const base64Data = imageSource.split(',')[1];
+      if (!base64Data) {
+        throw new Error('Invalid Base64 string format.');
+      }
+      imageBuffer = Buffer.from(base64Data, 'base64');
+
+    } else if (imageSource.startsWith('http')) {
+      // Сценарий 2: Это новый формат URL
+      console.log(`[Telegram] Обнаружен URL. Скачиваем изображение с: ${imageSource}`);
+      const response = await fetch(imageSource);
+      if (!response.ok) {
+        throw new Error(`Failed to download image from URL: ${response.statusText}`);
+      }
+      // Преобразуем скачанные данные в Buffer
+      const arrayBuffer = await response.arrayBuffer();
+      imageBuffer = Buffer.from(arrayBuffer);
+
+    } else {
+      // Если формат неизвестен, выбрасываем ошибку
+      throw new Error('Unsupported image source format. Expected Base64 or URL.');
+    }
+    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+    // Дальнейшая логика остается почти без изменений, просто использует imageBuffer
     const imageFile = new CustomFile('image.jpg', imageBuffer.length, '', imageBuffer);
 
-    // Telegram имеет лимит на длину подписи к изображению.
-    const CAPTION_LIMIT = 1024;
+    // ... (остальной код вашей функции, если он есть, например, обрезка текста)
+    const MAX_CAPTION_LENGTH = 1024;
+    const truncatedText = text.slice(0, MAX_CAPTION_LENGTH);
 
-    console.log(`[Telegram] Отправка поста в канал "${channel.title}"...`);
+    await client.sendFile(entity, {
+      file: imageFile,
+      caption: truncatedText,
+      parseMode: 'html',
+    });
 
-    // Если текст превышает лимит, разделяем его.
-    if (text.length > CAPTION_LIMIT) {
-      console.log('[Telegram] Текст слишком длинный, будет разделен на два сообщения.');
+    console.log(`[Telegram] Пост успешно отправлен в канал ${channelId}`);
 
-      const caption = text.substring(0, CAPTION_LIMIT);
-      const followUpMessage = text.substring(CAPTION_LIMIT);
-
-      // 1. Отправляем картинку с первой (урезанной) частью текста.
-      await client.sendMessage(channel, {
-        message: caption,
-        file: imageFile,
-      });
-
-      // 2. Отправляем остаток текста вторым, отдельным сообщением.
-      await client.sendMessage(channel, {
-        message: followUpMessage,
-      });
-    } else {
-      // Если текст в пределах лимита, отправляем одним сообщением.
-      await client.sendMessage(channel, {
-        message: text,
-        file: imageFile,
-      });
-    }
-
-    console.log('[Telegram] Пост успешно отправлен!');
   } catch (error) {
     console.error('[Telegram] Ошибка при отправке поста:', error);
-    throw error; // Пробрасываем ошибку дальше, чтобы ее можно было обработать на уровне UI.
+    // Пробрасываем ошибку дальше, чтобы ее можно было поймать в Server Action
+    throw error;
   } finally {
-    // Блок finally гарантирует, что клиент будет отключен
-    // даже в случае возникновения ошибки в блоке try.
     console.log('[Telegram] Отключение клиента после отправки.');
     await client.disconnect();
   }

@@ -40,7 +40,6 @@ export default function HomePage() {
             </button>
           </header>
 
-          {/* Ваш основной компонент теперь показывается только авторизованным пользователям */}
           <MessageFetcher />
 
         </div>
@@ -58,7 +57,6 @@ export default function HomePage() {
           Войдите через Telegram для анализа постов
         </p>
         <div className="flex justify-center">
-          {/* Наша кнопка входа */}
           <TelegramLoginWidget />
         </div>
       </div>

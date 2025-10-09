@@ -22,12 +22,15 @@ export function cleanTextForAI(text: string): string {
   // 4. Удаляем символы форматирования Markdown (*, _, ~, `)
   cleanedText = cleanedText.replace(/[*_~`]/g, '');
 
-  // 5. Удаляем возможные слова-триггеры или рекламные метки
+  // 5. Удаляем все эмодзи и многие другие символы, не являющиеся текстом
+  cleanedText = cleanedText.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
+  // 6. Удаляем возможные слова-триггеры или рекламные метки
   cleanedText = cleanedText.replace(/Реклама\./gi, '');
   cleanedText = cleanedText.replace(/Подписаться/gi, '');
 
 
-  // 6. Заменяем множественные пробелы и переносы строк на один пробел
+  // 7. Заменяем множественные пробелы и переносы строк на один пробел
   cleanedText = cleanedText.replace(/\s\s+/g, ' ').trim();
 
   return cleanedText;
