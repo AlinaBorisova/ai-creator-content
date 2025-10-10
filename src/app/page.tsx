@@ -51,8 +51,8 @@ export default function HomePage() {
   // Если сессии нет, показываем экран входа
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 text-white p-4">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-xl text-center max-w-md w-full">
-        <h1 className="text-3xl font-bold mb-2">TG Parser</h1>
+      <div className="bg-gray-800 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
+        <h1 className="text-5xl font-bold mb-4">TG Parser</h1>
         <p className="text-gray-400 mb-8">
           Войдите через Telegram для анализа постов
         </p>

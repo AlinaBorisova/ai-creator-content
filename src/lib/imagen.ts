@@ -1,6 +1,10 @@
 // Константы для взаимодействия с API gen-api.ru
-const API_KEY = process.env.IMAGEN_API_KEY;
-const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/imagen-4';
+// const API_KEY = process.env.IMAGEN_API_KEY;
+// const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/imagen-4';
+// const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
+
+const API_KEY = process.env.FLUX_API_KEY;
+const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/flux';
 const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
 
 /**
@@ -17,7 +21,7 @@ async function generateSingleImage(prompt: string): Promise<string> {
   const startResponse = await fetch(START_GENERATION_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
-    body: JSON.stringify({ prompt, images: 1, width: 1024, height: 1024 }),
+    body: JSON.stringify({ prompt, "model": "schnell", images: 1, width: 1024, height: 1024 }),
     signal: AbortSignal.timeout(60000), // Таймаут на сам запрос, если API долго не отвечает
   });
 
