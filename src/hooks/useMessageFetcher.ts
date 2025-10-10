@@ -1,4 +1,4 @@
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { PostState } from '@/types';
 import { getTelegramMessagesAction, rewriteTextAction, generateImageAction, sendPostAction, regeneratePromptAction } from '@/app/actions';
 

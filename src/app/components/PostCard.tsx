@@ -32,7 +32,6 @@ export function PostCard({
   onPromptChange,
   onRegeneratePrompt,
   isFetching,
-  destinationChannelId
 }: PostCardProps) {
   // Вычисляемые переменные для условного рендеринга
   const showRegenerateButton = post.isEditingText && post.cleanText !== post.originalCleanText;

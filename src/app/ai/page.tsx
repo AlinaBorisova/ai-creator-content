@@ -27,11 +27,6 @@ export default function AIPage() {
     [streams]
   );
 
-  const resetStreams = useCallback(() => {
-    setStreams(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
-    controllersRef.current = Array.from({ length: PANELS_COUNT }, () => null);
-  }, []);
-
   const abortOne = useCallback((index: number) => {
     const ctrl = controllersRef.current[index];
     if (ctrl) {
@@ -66,71 +61,6 @@ export default function AIPage() {
     }
   }, [streams]);
 
-  const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    // touch & validate
-    if (!prompt.canSubmit) {
-      prompt.setTouched(true);
-      prompt.setError('Введите корректный промпт');
-      return;
-    }
-
-    // Сбрасываем предыдущие результаты, отмечаем все потоки как loading
-    setStreams(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'loading' })));
-    controllersRef.current = Array.from({ length: PANELS_COUNT }, () => new AbortController());
-
-    // Запускаем 5 параллельных потоков
-    for (let i = 0; i < PANELS_COUNT; i++) {
-      const ctrl = controllersRef.current[i]!;
-      startStream(i, prompt.value, ctrl);
-    }
-  }, [prompt]);
-
-  // Подключите ваш стриминговый эндпоинт здесь (NDJSON или текстовые чанки)
-  // и инкрементально добавляйте дельты в соответствующий индекс.
-  const startStream = useCallback(async (index: number, p: string, ctrl: AbortController) => {
-    try {
-      const res = await fetch('/api/ai/gemini/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: p }),
-        signal: ctrl.signal,
-      });
-      if (!res.ok || !res.body) throw new Error('Streaming failed');
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        // Если NDJSON — парсим по строкам:
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const msg = JSON.parse(line);
-          if (msg.delta) {
-            appendDelta(index, msg.delta);
-          }
-          if (msg.done) {
-            markDone(index);
-          }
-        }
-      }
-    } catch (err: any) {
-      if (ctrl.signal.aborted) return;
-      setStreams(prev => {
-        const next = [...prev];
-        next[index] = { ...next[index], status: 'error', error: err?.message ?? 'Stream error' };
-        return next;
-      });
-    }
-  }, []);
-
   const appendDelta = useCallback((index: number, delta: string) => {
     setStreams(prev => {
       const next = [...prev];
@@ -150,6 +80,66 @@ export default function AIPage() {
       return next;
     });
   }, []);
+
+  const startStream = useCallback(async (index: number, p: string, ctrl: AbortController) => {
+    try {
+      const res = await fetch('/api/ai/gemini/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: p }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) throw new Error('Streaming failed');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const msg = JSON.parse(line);
+          if (msg.delta) {
+            appendDelta(index, msg.delta);
+          }
+          if (msg.done) {
+            markDone(index);
+          }
+        }
+      }
+    } catch (err) {
+      if (ctrl.signal.aborted) return;
+      const message = err instanceof Error ? err.message : 'Stream error';
+      setStreams(prev => {
+        const next = [...prev];
+        next[index] = { ...next[index], status: 'error', error: message };
+        return next;
+      });
+    }
+  }, [appendDelta, markDone]);
+
+  const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!prompt.canSubmit) {
+      prompt.setTouched(true);
+      prompt.setError('Введите корректный промпт');
+      return;
+    }
+
+    setStreams(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'loading' })));
+    controllersRef.current = Array.from({ length: PANELS_COUNT }, () => new AbortController());
+
+    for (let i = 0; i < PANELS_COUNT; i++) {
+      const ctrl = controllersRef.current[i]!;
+      startStream(i, prompt.value, ctrl);
+    }
+  }, [prompt, startStream]);
 
   return (
     <main className="min-h-screen">
