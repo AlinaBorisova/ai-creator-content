@@ -56,9 +56,6 @@ export function ChannelInputs({
           {error}
         </div>
       )}
-      {isFetching && postsCount === 0 && (
-        <div className="text-center text-gray-400">Идет загрузка...</div>
-      )}
     </div>
   );
 }
