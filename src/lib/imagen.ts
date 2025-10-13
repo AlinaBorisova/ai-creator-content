@@ -1,9 +1,9 @@
 // Константы для взаимодействия с API gen-api.ru
-// const API_KEY = process.env.IMAGEN_API_KEY;
+// const API_KEY = process.env.GEN_API_KEY;
 // const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/imagen-4';
 // const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
 
-const API_KEY = process.env.FLUX_API_KEY;
+const FLUX_API_KEY = process.env.GEN_API_KEY;
 const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/flux';
 const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
 
@@ -20,7 +20,7 @@ async function generateSingleImage(prompt: string): Promise<string> {
   // Этап 1: Запуск задачи на генерацию
   const startResponse = await fetch(START_GENERATION_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${FLUX_API_KEY}` },
     body: JSON.stringify({ prompt, "model": "schnell", images: 1, width: 1024, height: 1024 }),
     signal: AbortSignal.timeout(60000), // Таймаут на сам запрос, если API долго не отвечает
   });
@@ -39,7 +39,7 @@ async function generateSingleImage(prompt: string): Promise<string> {
     await new Promise(resolve => setTimeout(resolve, 5000)); // Пауза 5 секунд между проверками
     const checkResponse = await fetch(`${CHECK_STATUS_URL_BASE}${requestId}`, {
       method: 'GET',
-      headers: { 'Authorization': `Bearer ${API_KEY}` },
+      headers: { 'Authorization': `Bearer ${FLUX_API_KEY}` },
     });
     if (!checkResponse.ok) continue; // Если проверка не удалась, пробуем снова в следующей итерации
 
@@ -64,7 +64,7 @@ async function generateSingleImage(prompt: string): Promise<string> {
  * @throws Ошибка, если ключ API не определен или если произошла ошибка в процессе генерации.
  */
 export async function generateImageWithImagen4(prompt: string): Promise<string[]> {
-  if (!API_KEY) {
+  if (!FLUX_API_KEY) {
     throw new Error('IMAGEN_API_KEY is not defined in environment variables.');
   }
 

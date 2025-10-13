@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEN_API_KEY;
 const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/gemini-2-5-flash';
 const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
 
