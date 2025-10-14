@@ -63,6 +63,9 @@ function extractHtmlFromMarkdown(text: string): string {
 export default function AIPage() {
   const prompt = usePromptInput({ minLen: 5, maxLen: 2000 });
   const [mode, setMode] = useState<'text' | 'html'>('text');
+  const [leftPanelWidth, setLeftPanelWidth] = useState(50); // в процентах
+  const [isResizing, setIsResizing] = useState(false);
+
   // История запросов для каждого режима
   const [textHistory, setTextHistory] = useLocalStorage<HistoryItem[]>('ai-text-history', []);
   const [htmlHistory, setHtmlHistory] = useLocalStorage<HistoryItem[]>('ai-html-history', []);
@@ -85,6 +88,41 @@ export default function AIPage() {
     () => Array.from({ length: PANELS_COUNT }, () => false)
   );
 
+  // Обработчики для перетаскивания
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+
+    const container = document.querySelector('.resizable-container');
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+    const clampedWidth = Math.min(Math.max(newWidth, 20), 80); // ограничиваем от 20% до 80%
+
+    setLeftPanelWidth(clampedWidth);
+  }, [isResizing]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // useEffect для обработки событий мыши
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
   // Выбираем активные streams в зависимости от режима
   const streams = mode === 'html' ? htmlStreams : textStreams;
   const setStreams = mode === 'html' ? setHtmlStreams : setTextStreams;
@@ -92,7 +130,7 @@ export default function AIPage() {
   const controllersRef = useRef<Array<AbortController | null>>(
     Array.from({ length: PANELS_COUNT }, () => null)
   );
-  
+
   // Флаг для отслеживания сохранения результатов
   const hasSavedRef = useRef(false);
 
@@ -158,11 +196,11 @@ export default function AIPage() {
       const next = [...prev];
       if (!next[index]) return prev;
       next[index] = { ...next[index], status: 'done' };
-      console.log(`📊 Updated streams after markDone:`, next.map((s, i) => ({ 
-        index: i, 
-        status: s.status, 
-        hasText: !!s.text, 
-        textLength: s.text.length 
+      console.log(`📊 Updated streams after markDone:`, next.map((s, i) => ({
+        index: i,
+        status: s.status,
+        hasText: !!s.text,
+        textLength: s.text.length
       })));
       return next;
     });
@@ -246,7 +284,7 @@ export default function AIPage() {
     }
 
     console.log('🎯 Starting generation with prompt:', prompt.value);
-    
+
     // Сбрасываем флаг сохранения
     hasSavedRef.current = false;
 
@@ -294,14 +332,14 @@ RULES:
 
   const saveToHistory = useCallback((promptText: string, results: StreamState[]) => {
     console.log('Saving to history:', promptText, results); // Отладка
-    
+
     const newItem: HistoryItem = {
       id: Date.now().toString(),
       prompt: promptText,
       timestamp: Date.now(),
       results: results.map(r => ({ ...r })), // Копируем результаты
     };
-  
+
     setHistory(prev => {
       // Проверяем, нет ли уже такого промпта в истории
       const exists = prev.some(item => item.prompt === promptText);
@@ -315,7 +353,7 @@ RULES:
         console.log('Updated existing history item:', updated);
         return updated;
       }
-  
+
       // Добавляем в начало массива и ограничиваем до 20 элементов
       const newHistory = [newItem, ...prev].slice(0, 20);
       console.log('Added new history item:', newHistory);
@@ -327,9 +365,9 @@ RULES:
   const loadFromHistory = useCallback((item: HistoryItem) => {
     console.log('Loading from history:', item); // Отладка
     console.log('Item results:', item.results);
-    
+
     prompt.setValue(item.prompt);
-    
+
     // Загружаем сохраненные результаты, если они есть
     if (item.results && item.results.length > 0) {
       // Создаем массив из 5 элементов, заполняя недостающие пустыми
@@ -340,7 +378,7 @@ RULES:
           return { text: '', status: 'idle' as StreamStatus };
         }
       });
-      
+
       console.log('Setting streams with padded results:', paddedResults);
       setStreams(paddedResults);
     } else {
@@ -357,26 +395,26 @@ RULES:
   // Автоматически сохраняем результаты в историю после завершения генерации
   useEffect(() => {
     console.log('🔄 useEffect triggered for saveResultsToHistory');
-    
+
     const allDone = streams.every(s => s.status === 'done' || s.status === 'error');
     const hasContent = streams.some(s => s.text);
-    
-    console.log('📊 Direct check in useEffect:', { 
-      allDone, 
+
+    console.log('📊 Direct check in useEffect:', {
+      allDone,
       hasContent,
       hasSaved: hasSavedRef.current,
-      streams: streams.map((s, i) => ({ 
-        index: i, 
-        status: s.status, 
-        hasText: !!s.text, 
-        textLength: s.text.length 
+      streams: streams.map((s, i) => ({
+        index: i,
+        status: s.status,
+        hasText: !!s.text,
+        textLength: s.text.length
       }))
     });
-    
+
     if (allDone && hasContent && !hasSavedRef.current) {
       console.log('💾 Saving results to history from useEffect...');
       hasSavedRef.current = true;
-      
+
       const newItem: HistoryItem = {
         id: Date.now().toString(),
         prompt: prompt.value,
@@ -419,7 +457,7 @@ RULES:
 
   return (
     <main className="min-h-screen">
-      <div className="max-w-7xl mx-auto w-full py-6 sm:py-10 px-4">
+      <div className="w-full mx-auto w-full py-6 sm:py-10 px-4">
         <div className="flex gap-6">
           {/* История слева */}
           <HistorySidebar
@@ -428,68 +466,8 @@ RULES:
             onLoadFromHistory={loadFromHistory}
             onDeleteFromHistory={deleteFromHistory}
           />
-          {/* <aside className="w-64 flex-shrink-0 hidden lg:block">
-            <div className="sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-200 mb-3">
-                История {mode === 'html' ? 'HTML' : 'текста'}
-              </h2>
-              <div className="space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2">
-                {history.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">История пуста</p>
-                ) : (
-                  history.map(item => (
-                    <div
-                      key={item.id}
-                      className="group relative bg-gray-800/50 border border-gray-700 rounded-lg p-3 hover:bg-gray-800 transition-colors"
-                    >
-                      <button
-                        onClick={() => loadFromHistory(item)}
-                        className="w-full text-left"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-300 line-clamp-3 break-words">
-                              {item.prompt}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-2">
-                              {new Date(item.timestamp).toLocaleDateString('ru-RU', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          </div>
-                          {/* Индикатор сохраненных результатов */}
-          {/* {item.results?.some(r => r.text) && (
-            <div className="ml-2 flex-shrink-0">
-              <div className="w-2 h-2 bg-green-500 rounded-full" title="Есть сохраненные результаты" />
-            </div>
-          )}
-        </div>
-      </button> */}
-          {/* <button
-        onClick={(e) => {
-          e.stopPropagation();
-          deleteFromHistory(item.id);
-        }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-red-900/50 hover:bg-red-900 text-red-300 rounded p-1"
-        title="Удалить"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  ))
-                )
-}
-              </div >
-            </div >
-          </aside > */}
-          {/* Основной контент справа */}
 
+          {/* Основной контент справа */}
           <div className="flex-1 min-w-0">
             {/* ... кнопки режимов ... */}
             <div className="flex gap-2 mb-4">
@@ -574,9 +552,12 @@ RULES:
 
                   {mode === 'html' ? (
                     // HTML режим: 2 колонки
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+                    <div className="resizable-container flex gap-2 flex-1">
                       {/* Левая колонка: код */}
-                      <div className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar">
+                      <div
+                        className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar"
+                        style={{ width: `${leftPanelWidth}%` }}
+                      >
                         <h4 className="text-xs font-semibold text-gray-400 mb-2">HTML Code:</h4>
                         <div className="flex-1 overflow-auto bg-gray-900 rounded p-3 border border-gray-700">
                           {s.status === 'error' ? (
@@ -596,8 +577,17 @@ RULES:
                         </div>
                       </div>
 
+                      {/* Разделитель */}
+                      <div
+                        className="w-1 bg-gray-600 hover:bg-gray-500 cursor-col-resize flex-shrink-0"
+                        onMouseDown={handleMouseDown}
+                      />
+
                       {/* Правая колонка: preview */}
-                      <div className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar">
+                      <div
+                      className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar"
+                      style={{ width: `${100 - leftPanelWidth}%` }}
+                      >
                         <h4 className="text-xs font-semibold text-gray-400 mb-2">Preview:</h4>
                         <div className="flex-1 bg-white rounded border border-gray-700 overflow-hidden">
                           {s.text && s.status !== 'error' ? (
