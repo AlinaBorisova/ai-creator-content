@@ -4,8 +4,8 @@ const encoder = new TextEncoder();
 
 export async function POST(req: Request) {
   const { prompt } = await req.json().catch(() => ({}));
-  if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 5 || prompt.trim().length > 2000) {
-    return Response.json({ error: 'Invalid prompt (5-2000 chars)' }, { status: 400 });
+  if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 5 || prompt.trim().length > 10000) {
+    return Response.json({ error: 'Invalid prompt (5-10000 chars)' }, { status: 400 });
   }
 
   const ac = new AbortController();

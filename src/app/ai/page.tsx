@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { usePromptInput } from '@/hooks/usePromtInput';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import dynamic from 'next/dynamic';
+import HistoryPanel from '../components/HistoryPanel';
 
 type StreamStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -61,14 +61,19 @@ function extractHtmlFromMarkdown(text: string): string {
 }
 
 export default function AIPage() {
-  const prompt = usePromptInput({ minLen: 5, maxLen: 2000 });
+  const prompt = usePromptInput({ minLen: 5, maxLen: 10000 });
   const [mode, setMode] = useState<'text' | 'html'>('text');
-  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // в процентах
-  const [isResizing, setIsResizing] = useState(false);
+  const [openCodePanels, setOpenCodePanels] = useState<boolean[]>(
+    () => Array.from({ length: PANELS_COUNT }, () => false)
+  );
+  const [iframeHeights, setIframeHeights] = useState<number[]>(
+    () => Array.from({ length: PANELS_COUNT }, () => 400)
+  );
 
   // История запросов для каждого режима
   const [textHistory, setTextHistory] = useLocalStorage<HistoryItem[]>('ai-text-history', []);
   const [htmlHistory, setHtmlHistory] = useLocalStorage<HistoryItem[]>('ai-html-history', []);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
 
   // Выбираем активную историю в зависимости от режима
@@ -88,41 +93,6 @@ export default function AIPage() {
     () => Array.from({ length: PANELS_COUNT }, () => false)
   );
 
-  // Обработчики для перетаскивания
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-
-    const container = document.querySelector('.resizable-container');
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
-    const clampedWidth = Math.min(Math.max(newWidth, 20), 80); // ограничиваем от 20% до 80%
-
-    setLeftPanelWidth(clampedWidth);
-  }, [isResizing]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  // useEffect для обработки событий мыши
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   // Выбираем активные streams в зависимости от режима
   const streams = mode === 'html' ? htmlStreams : textStreams;
   const setStreams = mode === 'html' ? setHtmlStreams : setTextStreams;
@@ -134,8 +104,30 @@ export default function AIPage() {
   // Флаг для отслеживания сохранения результатов
   const hasSavedRef = useRef(false);
 
+  const syncColumnHeights = useCallback(() => {
+    console.log('🔄 syncColumnHeights called');
+    console.log('Current iframe heights:', iframeHeights);
+
+    const containers = document.querySelectorAll('.result-container');
+
+    containers.forEach((container, index) => {
+      const codeColumn = container.querySelector('.code-column');
+
+      if (codeColumn) {
+        const codeContent = codeColumn.querySelector('.code-content');
+
+        if (codeContent) {
+          const iframeHeight = iframeHeights[index] || 400;
+          const newHeight = Math.max(iframeHeight - 60, 300); // минимум 300px
+          (codeContent as HTMLElement).style.height = `${newHeight}px`;
+          console.log(`Container ${index}: Setting code height to ${newHeight}px (iframe: ${iframeHeight}px)`);
+        }
+      }
+    });
+  }, [iframeHeights]);
+
   // Функция для изменения высоты iframe
-  const adjustIframeHeight = useCallback((iframe: HTMLIFrameElement) => {
+  const adjustIframeHeight = useCallback((iframe: HTMLIFrameElement, index: number) => {
     try {
       const doc = iframe.contentDocument || iframe.contentWindow?.document;
       if (doc) {
@@ -147,60 +139,81 @@ export default function AIPage() {
           doc.documentElement.offsetHeight
         );
         iframe.style.height = `${height}px`;
+
+        // Сохраняем высоту в состоянии
+        setIframeHeights(prev => {
+          const next = [...prev];
+          next[index] = height;
+          return next;
+        });
       }
     } catch (e) {
       // Если не можем получить доступ к содержимому (CORS), используем минимальную высоту
       iframe.style.height = '400px';
+      setIframeHeights(prev => {
+        const next = [...prev];
+        next[index] = 400;
+        return next;
+      });
     }
   }, []);
 
-  // Функция для синхронизации высот колонок
-  const syncColumnHeights = useCallback(() => {
-    const containers = document.querySelectorAll('.resizable-container');
-    containers.forEach((container) => {
-      const rightColumn = container.querySelector('.preview-column');
-      const leftColumn = container.querySelector('.code-column');
-      
-      if (rightColumn && leftColumn) {
-        const rightHeight = rightColumn.getBoundingClientRect().height;
-        const leftCodeContainer = leftColumn.querySelector('.code-container');
-        
-        if (leftCodeContainer) {
-          // Устанавливаем высоту контейнера с кодом равной высоте правой колонки
-          (leftCodeContainer as HTMLElement).style.height = `${rightHeight - 40}px`; // 40px для заголовка и отступов
-        }
-      }
-    });
-  }, []);
+
 
   // useEffect для обработки изменения содержимого
-  // useEffect с ResizeObserver
-useEffect(() => {
-  const iframes = document.querySelectorAll('iframe[title*="HTML Preview"]');
-  
-  iframes.forEach((iframe) => {
-    const htmlIframe = iframe as HTMLIFrameElement;
-    adjustIframeHeight(htmlIframe);
-    
-    // Используем ResizeObserver для отслеживания изменений
-    const resizeObserver = new ResizeObserver(() => {
-      syncColumnHeights();
+  useEffect(() => {
+    const iframes = document.querySelectorAll('iframe[title*="HTML Preview"]');
+
+    iframes.forEach((iframe, index) => {
+      const htmlIframe = iframe as HTMLIFrameElement;
+      adjustIframeHeight(htmlIframe, index);
+
+      const handleLoad = () => {
+        adjustIframeHeight(htmlIframe, index);
+      };
+
+      htmlIframe.addEventListener('load', handleLoad);
+
+      return () => {
+        htmlIframe.removeEventListener('load', handleLoad);
+      };
     });
-    
-    resizeObserver.observe(htmlIframe);
-    
-    const handleLoad = () => {
-      adjustIframeHeight(htmlIframe);
-    };
-    
-    htmlIframe.addEventListener('load', handleLoad);
-    
-    return () => {
-      resizeObserver.disconnect();
-      htmlIframe.removeEventListener('load', handleLoad);
-    };
-  });
-}, [streams, adjustIframeHeight, syncColumnHeights]);
+  }, [streams, adjustIframeHeight]);
+
+  // useEffect для синхронизации при изменении состояния панелей
+  useEffect(() => {
+    if (mode === 'html') {
+      const timer = setTimeout(() => {
+        syncColumnHeights();
+      }, 350);
+
+      return () => clearTimeout(timer);
+    }
+  }, [openCodePanels, syncColumnHeights, mode]);
+
+  // useEffect для синхронизации при изменении высот iframe
+  useEffect(() => {
+    if (mode === 'html') {
+      syncColumnHeights();
+    }
+  }, [iframeHeights, syncColumnHeights, mode]);
+
+  const toggleCodePanel = useCallback((index: number) => {
+    setOpenCodePanels(prev => {
+      const next = [...prev];
+      next[index] = !next[index];
+      return next;
+    });
+
+    // Принудительная синхронизация после изменения состояния (только в HTML режиме)
+    if (mode === 'html') {
+      setTimeout(() => {
+        syncColumnHeights();
+      }, 100);
+    }
+  }, [syncColumnHeights, mode]);
+
+
 
   const isStreaming = useMemo(
     () => streams.some(s => s.status === 'loading'),
@@ -507,36 +520,35 @@ RULES:
     }
   }, [streams, prompt.value, setHistory]);
 
-  const HistorySidebar = dynamic(() => import('../components/HistorySidebar'), {
-    ssr: false,
-    loading: () => (
-      <aside className="w-64 flex-shrink-0 hidden lg:block">
-        <div className="sticky top-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-3">
-            История {mode === 'html' ? 'HTML' : 'текста'}
-          </h2>
-          <div className="space-y-2 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar pr-2">
-            <p className="text-sm text-gray-500 italic">Загрузка...</p>
-          </div>
-        </div>
-      </aside>
-    )
-  });
 
   return (
     <main className="min-h-screen">
       <div className="w-full mx-auto w-full py-6 sm:py-10 px-4">
         <div className="flex gap-6">
-          {/* История слева */}
-          <HistorySidebar
+          {/* Кнопка для открытия истории */}
+          <button
+            onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+            className={`relative w-[50px] h-[50px] top-0 left-0 bg-gray-800 hover:bg-gray-700 text-gray-300 p-3 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 ${isHistoryOpen ? 'hidden' : 'block'}`}
+            title="История запросов"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
+          {/* Компонент истории */}
+          <HistoryPanel
             mode={mode}
             history={history}
+            isOpen={isHistoryOpen}
+            onClose={() => setIsHistoryOpen(false)}
             onLoadFromHistory={loadFromHistory}
             onDeleteFromHistory={deleteFromHistory}
           />
 
           {/* Основной контент справа */}
           <div className="flex-1 min-w-0">
+
             {/* ... кнопки режимов ... */}
             <div className="flex gap-2 mb-4">
               <button
@@ -558,6 +570,7 @@ RULES:
                 🌐 HTML Preview
               </button>
             </div>
+
             {/* ... форма ... */}
             <form onSubmit={onSubmit} className="flex flex-col items-center sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
@@ -565,16 +578,16 @@ RULES:
                 <textarea
                   id="prompt"
                   placeholder={mode === 'html' ? 'Describe the HTML page you want...' : 'Enter your prompt'}
-                  className="w-full border border-gray-700 rounded-lg px-4 py-4 min-h-[120px] sm:min-h-[80px] bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="w-full border border-gray-700 rounded-lg px-4 py-4 min-h-[250px] sm:min-h-[120px] bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   value={prompt.value}
                   onChange={prompt.onChange}
                   onBlur={prompt.onBlur}
-                  maxLength={2000}
+                  maxLength={10000}
                   aria-invalid={Boolean(prompt.touched && prompt.error)}
                   aria-describedby="prompt-help prompt-error"
                 />
                 <div className="mt-2 flex items-center justify-between text-sm text-gray-400">
-                  <span id="prompt-help">{prompt.length}/2000</span>
+                  <span id="prompt-help">{prompt.length}/10000</span>
                   {prompt.touched && prompt.error && (
                     <span id="prompt-error" className="text-red-400">{prompt.error}</span>
                   )}
@@ -599,6 +612,7 @@ RULES:
               </button> */}
               </div>
             </form>
+
             {/* ... результаты ... */}
             <div className="w-full flex flex-col gap-4 mt-8">
               {streams.map((s, i) => (
@@ -619,85 +633,118 @@ RULES:
                   </div>
 
                   {mode === 'html' ? (
-                    // HTML режим: 2 колонки - правая по контенту, левая подстраивается
-                    <div className="resizable-container flex gap-2">
-                      {/* Левая колонка: код */}
-                      <div
-                        className="flex flex-col code-column"
-                        style={{ width: `${leftPanelWidth}%` }}
-                      >
-                        <h4 className="text-xs font-semibold text-gray-400 mb-2">HTML Code:</h4>
-                        <div className="bg-gray-900 rounded p-3 border border-gray-700 overflow-auto custom-scrollbar code-container">
-                          {s.status === 'error' ? (
-                            <p className="text-red-300 text-sm">{s.error ?? 'Error'}</p>
-                          ) : editingStates[i] ? (
-                            <textarea
-                              value={s.text}
-                              onChange={(e) => updateText(i, e.target.value)}
-                              className="w-full h-full min-h-[400px] bg-gray-800 text-gray-300 text-xs font-mono p-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
-                              spellCheck={false}
-                            />
-                          ) : (
-                            <pre className="text-xs text-gray-300 whitespace-pre-wrap break-words">
-                              {s.text || (s.status === 'loading' ? 'Generating…' : 'No code yet')}
-                            </pre>
-                          )}
-                        </div>
-                      </div>
+                    // HTML режим: кнопка слева + preview + выдвижной блок с кодом
+                    <div className="w-full result-container">
+                      <div className="relative flex">
+                        {/* Кнопка для показа/скрытия кода слева */}
+                        <button
+                          onClick={() => toggleCodePanel(i)}
+                          className={`flex-shrink-0 w-12 h-12 mr-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${openCodePanels[i] ? 'bg-blue-600 hover:bg-blue-700 hidden' : ''
+                            }`}
+                          title={openCodePanels[i] ? 'Скрыть код' : 'Показать код'}
+                        >
+                          <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                          <span className="text-xs">Code</span>
+                        </button>
 
-                      {/* Разделитель */}
-                      <div
-                        className="w-1 bg-gray-600 hover:bg-gray-500 cursor-col-resize flex-shrink-0"
-                        onMouseDown={handleMouseDown}
-                      />
+                        {/* Контейнер для preview и кода */}
+                        <div className="flex-1 flex">
+                          {/* Блок с кодом */}
+                          <div className={`bg-gray-900 border-r border-gray-700 transition-all duration-300 ease-in-out code-column ${openCodePanels[i]
+                            ? 'w-1/2 opacity-100 translate-x-0'
+                            : 'w-0 opacity-0 -translate-x-full overflow-hidden'
+                            }`}>
+                            <div
+                              className="flex flex-col min-w-0"
+                              style={{ height: `${iframeHeights[i] || 400}px` }}
+                            >
+                              <div className="flex items-center justify-between p-2">
+                                <h4 className="text-sm font-semibold text-gray-200">HTML Code</h4>
+                                <button
+                                  onClick={() => toggleCodePanel(i)}
+                                  className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
 
-                      {/* Правая колонка: preview */}
-                      <div
-                        className="flex flex-col "
-                        style={{ width: `${100 - leftPanelWidth}%` }}
-                      >
-                        <h4 className="text-xs font-semibold text-gray-400 mb-2">Preview:</h4>
-                        <div className="bg-white rounded border border-gray-700 overflow-hidden">
-                          {s.text && s.status !== 'error' ? (
-                            (() => {
-                              const html = extractHtmlFromMarkdown(s.text);
-                              return html ? (
-                                <iframe
-                                  srcDoc={html}
-                                  className="w-full border-0 preview-column"
-                                  style={{ height: '400px' }} // Начальная высота
-                                  sandbox="allow-scripts allow-same-origin"
-                                  title={`HTML Preview ${i + 1}`}
-                                  onLoad={(e) => {
-                                    const iframe = e.target as HTMLIFrameElement;
-                                    adjustIframeHeight(iframe);
-                                  }}
-                                />
-                              ) : (
-                                <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
-                                  <p className="text-center px-4">
-                                    {s.status === 'loading' ? (
-                                      'Waiting for HTML block...'
-                                    ) : (
-                                      <>
-                                        No HTML code block found.<br />
-                                        <span className="text-xs">Looking for ```html ... ```</span>
-                                      </>
-                                    )}
-                                  </p>
+                              <div
+                                className="flex-1 overflow-y-auto custom-scrollbar code-content"
+                                style={{
+                                  minHeight: '300px',
+                                  height: `${Math.max((iframeHeights[i] || 400) - 60, 300)}px`
+                                }}
+                              >
+                                <div className="bg-gray-800 rounded p-3 border border-gray-700 h-full">
+                                  {s.status === 'error' ? (
+                                    <p className="text-red-300 text-sm">{s.error ?? 'Error'}</p>
+                                  ) : editingStates[i] ? (
+                                    <textarea
+                                      value={s.text}
+                                      onChange={(e) => updateText(i, e.target.value)}
+                                      className="w-full h-full min-h-[300px] bg-gray-700 text-gray-300 text-sm font-mono p-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+                                      spellCheck={false}
+                                    />
+                                  ) : (
+                                    <pre className="text-sm text-gray-300 whitespace-pre-wrap break-words h-full overflow-auto">
+                                      {s.text || (s.status === 'loading' ? 'Generating…' : 'No code yet')}
+                                    </pre>
+                                  )}
                                 </div>
-                              );
-                            })()
-                          ) : (
-                            <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
-                              {s.status === 'loading' ? 'Preview loading...' : 'No preview yet'}
+                              </div>
                             </div>
-                          )}
+                          </div>
+
+                          {/* Preview */}
+                          <div className={`bg-white border border-gray-700 overflow-hidden transition-all duration-300 preview-column ${openCodePanels[i]
+                            ? 'w-1/2 rounded-l-none'
+                            : 'w-full rounded-l'
+                            }`}>
+                            {s.text && s.status !== 'error' ? (
+                              (() => {
+                                const html = extractHtmlFromMarkdown(s.text);
+                                return html ? (
+                                  <iframe
+                                    srcDoc={html}
+                                    className="w-full border-0"
+                                    style={{ height: '400px' }}
+                                    sandbox="allow-scripts allow-same-origin"
+                                    title={`HTML Preview ${i + 1}`}
+                                    onLoad={(e) => {
+                                      const iframe = e.target as HTMLIFrameElement;
+                                      adjustIframeHeight(iframe, i);
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
+                                    <p className="text-center px-4">
+                                      {s.status === 'loading' ? (
+                                        'Waiting for HTML block...'
+                                      ) : (
+                                        <>
+                                          No HTML code block found.<br />
+                                          <span className="text-xs">Looking for ```html ... ```</span>
+                                        </>
+                                      )}
+                                    </p>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
+                                {s.status === 'loading' ? 'Preview loading...' : 'No preview yet'}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    // Text режим: как раньше
+                    // Text режим
                     <div className="flex-1 overflow-auto min-h-[200px]">
                       {s.status === 'error' ? (
                         <p className="text-red-300">{s.error ?? 'Error'}</p>

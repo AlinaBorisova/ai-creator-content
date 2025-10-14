@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = process.env.GEN_API_KEY;
-const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/gemini-2-5-flash';
+const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/gemini-2-5-pro';
 const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
 
 type StartResp = { request_id: string };
@@ -14,7 +14,7 @@ async function startTextJob(prompt: string): Promise<string> {
   if(!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
   const cleaned = prompt.trim();
   if (!prompt || cleaned.length < 5) throw new Error('Prompt is too short');
-  if (cleaned.length > 2000) throw new Error('Prompt is too long');
+  if (cleaned.length > 10000) throw new Error('Prompt is too long');
 
   // Этап 1: Запуск задачи на генерацию
   const startResponse = await fetch(START_GENERATION_URL, {
@@ -95,7 +95,7 @@ export async function streamTextViaGenApi(
 
   if(!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
   if (!prompt || cleaned.length < 5) throw new Error('Prompt is too short');
-  if (cleaned.length > 2000) throw new Error('Prompt is too long');
+  if (cleaned.length > 10000) throw new Error('Prompt is too long');
 
   const requestId = await startTextJob(prompt);
   let lastLen = 0;
