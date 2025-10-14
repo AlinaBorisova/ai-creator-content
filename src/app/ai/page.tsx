@@ -63,7 +63,7 @@ function extractHtmlFromMarkdown(text: string): string {
 export default function AIPage() {
   const prompt = usePromptInput({ minLen: 5, maxLen: 2000 });
   const [mode, setMode] = useState<'text' | 'html'>('text');
-  const [leftPanelWidth, setLeftPanelWidth] = useState(50); // в процентах
+  const [leftPanelWidth, setLeftPanelWidth] = useState(30); // в процентах
   const [isResizing, setIsResizing] = useState(false);
 
   // История запросов для каждого режима
@@ -133,6 +133,74 @@ export default function AIPage() {
 
   // Флаг для отслеживания сохранения результатов
   const hasSavedRef = useRef(false);
+
+  // Функция для изменения высоты iframe
+  const adjustIframeHeight = useCallback((iframe: HTMLIFrameElement) => {
+    try {
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        const height = Math.max(
+          doc.body.scrollHeight,
+          doc.body.offsetHeight,
+          doc.documentElement.clientHeight,
+          doc.documentElement.scrollHeight,
+          doc.documentElement.offsetHeight
+        );
+        iframe.style.height = `${height}px`;
+      }
+    } catch (e) {
+      // Если не можем получить доступ к содержимому (CORS), используем минимальную высоту
+      iframe.style.height = '400px';
+    }
+  }, []);
+
+  // Функция для синхронизации высот колонок
+  const syncColumnHeights = useCallback(() => {
+    const containers = document.querySelectorAll('.resizable-container');
+    containers.forEach((container) => {
+      const rightColumn = container.querySelector('.preview-column');
+      const leftColumn = container.querySelector('.code-column');
+      
+      if (rightColumn && leftColumn) {
+        const rightHeight = rightColumn.getBoundingClientRect().height;
+        const leftCodeContainer = leftColumn.querySelector('.code-container');
+        
+        if (leftCodeContainer) {
+          // Устанавливаем высоту контейнера с кодом равной высоте правой колонки
+          (leftCodeContainer as HTMLElement).style.height = `${rightHeight - 40}px`; // 40px для заголовка и отступов
+        }
+      }
+    });
+  }, []);
+
+  // useEffect для обработки изменения содержимого
+  // useEffect с ResizeObserver
+useEffect(() => {
+  const iframes = document.querySelectorAll('iframe[title*="HTML Preview"]');
+  
+  iframes.forEach((iframe) => {
+    const htmlIframe = iframe as HTMLIFrameElement;
+    adjustIframeHeight(htmlIframe);
+    
+    // Используем ResizeObserver для отслеживания изменений
+    const resizeObserver = new ResizeObserver(() => {
+      syncColumnHeights();
+    });
+    
+    resizeObserver.observe(htmlIframe);
+    
+    const handleLoad = () => {
+      adjustIframeHeight(htmlIframe);
+    };
+    
+    htmlIframe.addEventListener('load', handleLoad);
+    
+    return () => {
+      resizeObserver.disconnect();
+      htmlIframe.removeEventListener('load', handleLoad);
+    };
+  });
+}, [streams, adjustIframeHeight, syncColumnHeights]);
 
   const isStreaming = useMemo(
     () => streams.some(s => s.status === 'loading'),
@@ -534,7 +602,7 @@ RULES:
             {/* ... результаты ... */}
             <div className="w-full flex flex-col gap-4 mt-8">
               {streams.map((s, i) => (
-                <div key={i} className="rounded-xl border border-gray-800 bg-gray-800/50 p-4 flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar">
+                <div key={i} className="rounded-xl border border-gray-800 bg-gray-800/50 p-4 flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-gray-200">Result #{i + 1}</h3>
                     <span className={
@@ -551,15 +619,15 @@ RULES:
                   </div>
 
                   {mode === 'html' ? (
-                    // HTML режим: 2 колонки
-                    <div className="resizable-container flex gap-2 flex-1">
+                    // HTML режим: 2 колонки - правая по контенту, левая подстраивается
+                    <div className="resizable-container flex gap-2">
                       {/* Левая колонка: код */}
                       <div
-                        className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar"
+                        className="flex flex-col code-column"
                         style={{ width: `${leftPanelWidth}%` }}
                       >
                         <h4 className="text-xs font-semibold text-gray-400 mb-2">HTML Code:</h4>
-                        <div className="flex-1 overflow-auto bg-gray-900 rounded p-3 border border-gray-700">
+                        <div className="bg-gray-900 rounded p-3 border border-gray-700 overflow-auto custom-scrollbar code-container">
                           {s.status === 'error' ? (
                             <p className="text-red-300 text-sm">{s.error ?? 'Error'}</p>
                           ) : editingStates[i] ? (
@@ -585,23 +653,28 @@ RULES:
 
                       {/* Правая колонка: preview */}
                       <div
-                      className="flex flex-col max-h-[600px] overflow-y-auto custom-scrollbar"
-                      style={{ width: `${100 - leftPanelWidth}%` }}
+                        className="flex flex-col "
+                        style={{ width: `${100 - leftPanelWidth}%` }}
                       >
                         <h4 className="text-xs font-semibold text-gray-400 mb-2">Preview:</h4>
-                        <div className="flex-1 bg-white rounded border border-gray-700 overflow-hidden">
+                        <div className="bg-white rounded border border-gray-700 overflow-hidden">
                           {s.text && s.status !== 'error' ? (
                             (() => {
                               const html = extractHtmlFromMarkdown(s.text);
                               return html ? (
                                 <iframe
                                   srcDoc={html}
-                                  className="w-full h-full min-h-[400px] border-0"
+                                  className="w-full border-0 preview-column"
+                                  style={{ height: '400px' }} // Начальная высота
                                   sandbox="allow-scripts allow-same-origin"
                                   title={`HTML Preview ${i + 1}`}
+                                  onLoad={(e) => {
+                                    const iframe = e.target as HTMLIFrameElement;
+                                    adjustIframeHeight(iframe);
+                                  }}
                                 />
                               ) : (
-                                <div className="flex items-center justify-center h-full min-h-[400px] text-gray-400 text-sm">
+                                <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
                                   <p className="text-center px-4">
                                     {s.status === 'loading' ? (
                                       'Waiting for HTML block...'
@@ -616,7 +689,7 @@ RULES:
                               );
                             })()
                           ) : (
-                            <div className="flex items-center justify-center h-full min-h-[400px] text-gray-400 text-sm">
+                            <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
                               {s.status === 'loading' ? 'Preview loading...' : 'No preview yet'}
                             </div>
                           )}
