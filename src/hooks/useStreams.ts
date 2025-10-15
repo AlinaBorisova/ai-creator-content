@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { StreamState, StreamStatus, PANELS_COUNT } from '@/types/stream';
+import { StreamState, PANELS_COUNT } from '@/types/stream';
 
 export const useStreams = () => {
   const [textStreams, setTextStreams] = useState<StreamState[]>(
@@ -83,11 +83,14 @@ export const useStreams = () => {
   }, []);
 
   useEffect(() => {
+    const deltaTimeoutRef = deltaTimeout.current;
+    const deltaQueueRef = deltaQueue.current;
+    
     return () => {
       // Очищаем все таймауты при размонтировании
-      deltaTimeout.current.forEach(timeout => clearTimeout(timeout));
-      deltaTimeout.current.clear();
-      deltaQueue.current.clear();
+      deltaTimeoutRef.forEach(timeout => clearTimeout(timeout));
+      deltaTimeoutRef.clear();
+      deltaQueueRef.clear();
     };
   }, []);
 

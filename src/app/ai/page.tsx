@@ -8,6 +8,7 @@ import { useIframeHeight } from '@/hooks/useIframeHeight';
 import { useCodePanels } from '@/hooks/useCodePanels';
 import HistoryPanel from '../components/HistoryPanel';
 import { StreamResult } from '@/app/components/StreamResult';
+import { StreamState } from '@/types/stream';
 import { HistoryItem, PANELS_COUNT } from '@/types/stream';
 
 export default function AIPage() {
@@ -141,7 +142,7 @@ export default function AIPage() {
                 markDone(index, mode);
               }, 500);
             }
-          } catch (e) {
+          } catch {
             console.warn(`[Stream ${index}] Invalid JSON line, skipping:`, line.slice(0, 50));
             continue;
           }
@@ -218,7 +219,7 @@ RULES:
     }
   }, [prompt, startStream, mode, setStreams]);
 
-  const saveToHistory = useCallback((promptText: string, results: any[]) => {
+  const saveToHistory = useCallback((promptText: string, results: StreamState[]) => {
     console.log('Saving to history:', promptText, results);
 
     const newItem: HistoryItem = {

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PANELS_COUNT } from '@/types/stream';
+import { StreamState, PANELS_COUNT } from '@/types/stream';
 
-export const useIframeHeight = (mode: 'text' | 'html', streams: any[]) => {
+export const useIframeHeight = (mode: 'text' | 'html', streams: StreamState[]) => {
   const [iframeHeights, setIframeHeights] = useState<number[]>(
     () => Array.from({ length: PANELS_COUNT }, () => 400)
   );
