@@ -28,7 +28,7 @@ export type UsePromptInputReturn = {
 export function usePromptInput(options: UsePromptInputOptions = {}): UsePromptInputReturn {
   const {
     minLen = 5,
-    maxLen = 10000,
+    maxLen = 50000,
     trimOnBlur = true,
     initialValue = '',
     validateExtra,
