@@ -3,16 +3,16 @@ import { prisma } from '@/lib/prisma';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
-
+    const { id } = await params;
+    
     await prisma.apiHistory.delete({
       where: { id }
     });
 
-    return NextResponse.json({ message: 'History item deleted' });
+    return NextResponse.json({ message: 'History item deleted successfully' });
   } catch (error) {
     console.error('Error deleting history item:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
