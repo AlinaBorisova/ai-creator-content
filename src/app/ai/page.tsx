@@ -1,16 +1,18 @@
 'use client';
 
+import { useServerHistory } from '@/hooks/useServerHistory';
+import { useAuth } from '@/hooks/useAuth';
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { usePromptInput } from '@/hooks/usePromtInput';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useStreams } from '@/hooks/useStreams';
 import { useIframeHeight } from '@/hooks/useIframeHeight';
 import { useCodePanels } from '@/hooks/useCodePanels';
 import HistoryPanel from '../components/HistoryPanel';
 import { StreamResult } from '@/app/components/StreamResult';
 import { StreamState } from '@/types/stream';
-import { HistoryItem, PANELS_COUNT } from '@/types/stream';
+import { PANELS_COUNT, ServerHistoryItem } from '@/types/stream';
 import Image from 'next/image';
+import Link from 'next/link';
 
 // Тип для изображения
 interface GeneratedImage {
@@ -31,6 +33,7 @@ interface ImageGenerationResult {
 }
 
 export default function AIPage() {
+  const { user, loading } = useAuth();
   const prompt = usePromptInput({ minLen: 5, maxLen: 50000 });
   const [mode, setMode] = useState<'text' | 'html' | 'images'>('html');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -47,49 +50,19 @@ export default function AIPage() {
   const [imageResults, setImageResults] = useState<ImageGenerationResult[]>([]);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
 
-  // История запросов для каждого режима и модели
-  const [textHistory, setTextHistory] = useLocalStorage<HistoryItem[]>('ai-text-history', []);
-  const [htmlHistory, setHtmlHistory] = useLocalStorage<HistoryItem[]>('ai-html-history', []);
-  
-  // Отдельные истории для каждой модели изображений
-  const [imagen4History, setImagen4History] = useLocalStorage<HistoryItem[]>('ai-imagen4-history', []);
-  const [fluxHistory, setFluxHistory] = useLocalStorage<HistoryItem[]>('ai-flux-history', []);
-  const [bananaHistory, setBananaHistory] = useLocalStorage<HistoryItem[]>('ai-banana-history', []);
-  const [ideogramHistory, setIdeogramHistory] = useLocalStorage<HistoryItem[]>('ai-ideogram-history', []);
+  // Получаем пользователя и серверную историю
+  const { history: serverHistory, loadHistory, saveToHistory, deleteFromHistory } = useServerHistory(user?.id || '');
 
-  // Выбираем активную историю в зависимости от режима и модели
-  const getCurrentHistory = useCallback(() => {
-    if (mode === 'html') return htmlHistory;
-    if (mode === 'text') return textHistory;
-    if (mode === 'images') {
-      switch (selectedImageModel) {
-        case 'Imagen 4': return imagen4History;
-        case 'Flux': return fluxHistory;
-        case 'Banana': return bananaHistory;
-        case 'Ideogram': return ideogramHistory;
-        default: return [];
-      }
+  // Используем серверную историю
+  const history = serverHistory;
+  const setHistory = useCallback((updater: ServerHistoryItem[] | ((prev: ServerHistoryItem[]) => ServerHistoryItem[])) => {
+    // Обновление будет через saveToHistory
+    if (typeof updater === 'function') {
+      // Если передана функция, применяем её к текущей истории
+      updater(serverHistory);
+      // Здесь можно добавить логику для обновления серверной истории
     }
-    return [];
-  }, [mode, selectedImageModel, htmlHistory, textHistory, imagen4History, fluxHistory, bananaHistory, ideogramHistory]);
-
-  const getCurrentSetHistory = useCallback(() => {
-    if (mode === 'html') return setHtmlHistory;
-    if (mode === 'text') return setTextHistory;
-    if (mode === 'images') {
-      switch (selectedImageModel) {
-        case 'Imagen 4': return setImagen4History;
-        case 'Flux': return setFluxHistory;
-        case 'Banana': return setBananaHistory;
-        case 'Ideogram': return setIdeogramHistory;
-        default: return () => {};
-      }
-    }
-    return () => {};
-  }, [mode, selectedImageModel, setHtmlHistory, setTextHistory, setImagen4History, setFluxHistory, setBananaHistory, setIdeogramHistory]);
-
-  const history = getCurrentHistory();
-  const setHistory = getCurrentSetHistory();
+  }, [serverHistory]);
 
   // Хуки для управления streams
   const { getStreams, setStreams, markDone, appendDelta } = useStreams();
@@ -112,7 +85,7 @@ export default function AIPage() {
   }, []);
 
   // Функция для генерации изображений через Imagen API
-  const generateImages = useCallback(async (promptText: string): Promise<{images: GeneratedImage[], translation?: {original: string, translated: string, language: string, wasTranslated: boolean, hasSlavicPrompts: boolean}}> => {
+  const generateImages = useCallback(async (promptText: string): Promise<{ images: GeneratedImage[], translation?: { original: string, translated: string, language: string, wasTranslated: boolean, hasSlavicPrompts: boolean } }> => {
     try {
       const response = await fetch('/api/ai/imagen', {
         method: 'POST',
@@ -175,21 +148,21 @@ export default function AIPage() {
 
     // Проверяем, выбрана ли модель Imagen 4
     const isImagen4 = selectedImageModel === 'Imagen 4';
-    
+
     if (isImagen4) {
       // Генерируем изображения через Imagen 4 API
       setIsGeneratingImages(true);
-      
+
       try {
         const results: ImageGenerationResult[] = [];
-        
+
         for (let i = 0; i < prompts.length; i++) {
           const promptText = prompts[i];
           console.log(`🎨 Generating images for prompt ${i + 1}:`, promptText);
-          
+
           try {
             const result = await generateImages(promptText);
-            
+
             results.push({
               prompt: promptText,
               images: result.images,
@@ -210,31 +183,36 @@ export default function AIPage() {
               wasTranslated: false
             });
           }
-          
+
           // Обновляем результаты по мере генерации
           setImageResults([...results]);
         }
 
         // Сохраняем в соответствующую историю после завершения генерации
         if (results.length > 0) {
-          const newItem: HistoryItem = {
+          const newServerItem: ServerHistoryItem = {
             id: Date.now().toString(),
+            userId: user?.id || '',
             prompt: prompt.value,
-            timestamp: Date.now(),
-            imageResults: results.map(r => ({ ...r })),
-            model: selectedImageModel, // Добавляем информацию о модели
+            mode: 'images',
+            model: selectedImageModel || undefined,
+            results: results.map(r => ({ ...r })),
+            createdAt: new Date().toISOString()
           };
 
-          setHistory(prev => {
-            const exists = prev.some(item => item.prompt === prompt.value);
+          setHistory((prev: ServerHistoryItem[]) => {
+            const exists = prev.some((item: ServerHistoryItem) => item.prompt === prompt.value);
             if (exists) {
-              return prev.map(item =>
+              return prev.map((item: ServerHistoryItem) =>
                 item.prompt === prompt.value
-                  ? { ...item, imageResults: results.map(r => ({ ...r })), timestamp: Date.now() }
+                  ? {
+                    ...item,
+                    results: results.map((r: ImageGenerationResult) => ({ ...r }))
+                  }
                   : item
               );
             }
-            return [newItem, ...prev].slice(0, 20);
+            return [newServerItem, ...prev].slice(0, 20);
           });
         }
       } catch (error) {
@@ -246,7 +224,7 @@ export default function AIPage() {
     } else {
       // Для других моделей показываем заглушки
       console.log('🎨 Using placeholder for model:', selectedImageModel);
-      
+
       setTimeout(() => {
         const placeholderResults: ImageGenerationResult[] = prompts.map(promptText => ({
           prompt: promptText,
@@ -260,28 +238,33 @@ export default function AIPage() {
         setIsParsingPrompts(false);
 
         // Сохраняем в соответствующую историю и для заглушек
-        const newItem: HistoryItem = {
+        const newServerItem: ServerHistoryItem = {
           id: Date.now().toString(),
+          userId: user?.id || '',
           prompt: prompt.value,
-          timestamp: Date.now(),
-          imageResults: placeholderResults.map(r => ({ ...r })),
+          mode: 'images',
           model: selectedImageModel || 'Unknown',
+          results: placeholderResults.map(r => ({ ...r })),
+          createdAt: new Date().toISOString()
         };
 
-        setHistory(prev => {
-          const exists = prev.some(item => item.prompt === prompt.value);
+        setHistory((prev: ServerHistoryItem[]) => {
+          const exists = prev.some((item: ServerHistoryItem) => item.prompt === prompt.value);
           if (exists) {
-            return prev.map(item =>
+            return prev.map((item: ServerHistoryItem) =>
               item.prompt === prompt.value
-                ? { ...item, imageResults: placeholderResults.map(r => ({ ...r })), timestamp: Date.now() }
+                ? {
+                  ...item,
+                  results: placeholderResults.map((r: ImageGenerationResult) => ({ ...r }))
+                }
                 : item
             );
           }
-          return [newItem, ...prev].slice(0, 20);
+          return [newServerItem, ...prev].slice(0, 20);
         });
       }, 1000);
     }
-  }, [prompt, parsePrompts, generateImages, selectedImageModel, setHistory]);
+  }, [prompt, parsePrompts, generateImages, selectedImageModel, setHistory, user?.id]);
 
   const downloadImage = useCallback(async (imageBytes: string, mimeType: string, filename: string) => {
     try {
@@ -390,25 +373,25 @@ export default function AIPage() {
       const res = await fetch('/api/ai/gemini/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: p,
           requestIndex: index
         }),
         signal: ctrl.signal,
       });
-  
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-  
+
       const reader = res.body?.getReader();
       if (!reader) {
         throw new Error('No reader available');
       }
-  
+
       const decoder = new TextDecoder();
       let buffer = '';
-  
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -510,57 +493,46 @@ RULES:
     }
   }, [prompt, startStream, mode, setStreams, handleImagesMode, requestCount]);
 
-  const saveToHistory = useCallback((promptText: string, results: StreamState[]) => {
-    console.log('Saving to history:', promptText, results);
+  const saveToHistoryLocal = useCallback(async (promptText: string, results: StreamState[]) => {
+    console.log('Saving to server history:', promptText, results);
 
-    const newItem: HistoryItem = {
-      id: Date.now().toString(),
-      prompt: promptText,
-      timestamp: Date.now(),
-      results: results.map(r => ({ ...r })),
-    };
+    await saveToHistory(
+      promptText,
+      mode,
+      mode === 'images' ? (selectedImageModel || undefined) : undefined,
+      results
+    );
+  }, [saveToHistory, mode, selectedImageModel]);
 
-    setHistory(prev => {
-      const exists = prev.some(item => item.prompt === promptText);
-      if (exists) {
-        return prev.map(item =>
-          item.prompt === promptText
-            ? { ...item, results: results.map(r => ({ ...r })), timestamp: Date.now() }
-            : item
-        );
-      }
-      return [newItem, ...prev].slice(0, 20);
-    });
-  }, [setHistory]);
-
-  const loadFromHistory = useCallback((item: HistoryItem) => {
+  const loadFromHistory = useCallback((item: ServerHistoryItem) => {
     console.log('Loading from history:', item);
 
     prompt.setValue(item.prompt);
 
-    if (mode === 'images' && item.imageResults) {
+    if (mode === 'images' && item.results && Array.isArray(item.results)) {
       // Загружаем результаты изображений
-      setImageResults(item.imageResults);
-      setParsedPrompts(item.imageResults.map(r => r.prompt));
-    } else if (item.results && item.results.length > 0) {
+      setImageResults(item.results as ImageGenerationResult[]);
+      setParsedPrompts((item.results as ImageGenerationResult[]).map((r: ImageGenerationResult) => r.prompt));
+    } else if (item.results && Array.isArray(item.results) && item.results.length > 0) {
       // Загружаем результаты text/html
+      const resultsArray = item.results as StreamState[];
       const paddedResults = Array.from({ length: PANELS_COUNT }, (_, i) => {
-        if (i < item.results!.length) {
-          return { ...item.results![i] };
+        if (i < resultsArray.length) {
+          return { ...resultsArray[i] };
         } else {
           return { text: '', status: 'idle' as const };
         }
       });
-
+    
       setStreams(mode)(paddedResults);
     } else {
       setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
     }
   }, [prompt, setStreams, mode]);
 
-  const deleteFromHistory = useCallback((id: string) => {
-    setHistory(prev => prev.filter(item => item.id !== id));
-  }, [setHistory]);
+  const deleteFromHistoryLocal = useCallback((id: string) => {
+    deleteFromHistory(id);
+  }, [deleteFromHistory]);
 
   // Автоматически сохраняем результаты в историю после завершения генерации
   useEffect(() => {
@@ -569,11 +541,43 @@ RULES:
 
     if (allDone && hasContent && !hasSavedRef.current) {
       hasSavedRef.current = true;
-      saveToHistory(prompt.value, streams);
+      saveToHistoryLocal(prompt.value, streams);
     } else if (!allDone) {
       hasSavedRef.current = false;
     }
-  }, [streams, prompt.value, saveToHistory]);
+  }, [streams, prompt.value, saveToHistoryLocal]);
+
+  // Загружаем историю при монтировании
+  useEffect(() => {
+    if (user?.id) {
+      loadHistory();
+    }
+  }, [user?.id, loadHistory]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        <div className="text-center">
+          <div className="animate-spin text-4xl mb-4">⏳</div>
+          <p>Checking authorization...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        <div className="bg-gray-800 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-gray-400 mb-6">You need to be authorized to access this page.</p>
+          <Link href="/" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors">
+            Go to Login
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen">
@@ -597,8 +601,8 @@ RULES:
             isOpen={isHistoryOpen}
             onClose={() => setIsHistoryOpen(false)}
             onLoadFromHistory={loadFromHistory}
-            onDeleteFromHistory={deleteFromHistory}
-            selectedModel={selectedImageModel}
+            onDeleteFromHistory={deleteFromHistoryLocal}
+            //selectedModel={selectedImageModel}
           />
 
           {/* Основной контент справа */}
@@ -668,11 +672,10 @@ RULES:
                     <button
                       key={count}
                       onClick={() => setImageCount(count)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                        imageCount === count
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imageCount === count
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
                     >
                       {count}
                     </button>
@@ -686,11 +689,10 @@ RULES:
                     <button
                       key={count}
                       onClick={() => setRequestCount(count)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
-                        requestCount === count
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${requestCount === count
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
                     >
                       {count}
                     </button>
@@ -860,7 +862,7 @@ RULES:
 
                                 {/* Изображение */}
                                 <div className="flex-1 flex items-center justify-center max-h-[500px]">
-                                <Image
+                                  <Image
                                     src={`data:${image.mimeType};base64,${image.imageBytes}`}
                                     alt={`Generated image ${index + 1}-${imgIndex + 1}`}
                                     className="max-w-full max-h-full object-contain rounded"

@@ -1,26 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Mode, HistoryItem } from '@/types/stream';
+import { Mode } from '@/types/stream';
+import { ServerHistoryItem } from '@/types/stream';
 
 type HistoryPanelProps = {
   mode: Mode;
-  history: HistoryItem[];
+  history: ServerHistoryItem[];
   isOpen: boolean;
   onClose: () => void;
-  onLoadFromHistory: (item: HistoryItem) => void;
+  onLoadFromHistory: (item: ServerHistoryItem) => void;
   onDeleteFromHistory: (id: string) => void;
-  selectedModel?: string | null;
 };
 
-export default function HistoryPanel({ 
-  mode, 
-  history, 
-  isOpen, 
-  onClose, 
+export default function HistoryPanel({
+  mode,
+  history,
+  isOpen,
+  onClose,
   onLoadFromHistory,
-  onDeleteFromHistory,
-  selectedModel
+  onDeleteFromHistory
 }: HistoryPanelProps) {
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -32,28 +31,22 @@ export default function HistoryPanel({
     return null;
   }
 
-  const getModeTitle = (mode: Mode) => {
-    if (mode === 'images' && selectedModel) {
-      return `История ${selectedModel}`;
-    }
-    switch (mode) {
-      case 'text': return 'История текста';
-      case 'html': return 'История HTML';
-      case 'images': return 'История изображений';
-      default: return 'История';
-    }
-  };
+  // const getModeTitle = (item: ServerHistoryItem) => {
+  //   if (item.mode === 'images') {
+  //     return `Изображения${item.model ? ` (${item.model})` : ''}`;
+  //   }
+  //   return item.mode === 'html' ? 'HTML' : 'Текст';
+  // };
 
   return (
     <>
       {/* Выдвижная панель истории */}
-      <div className={`fixed top-0 left-0 h-full w-80 bg-gray-900 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${
-        isOpen ? 'translate-x-0' : '-translate-x-full'
-      }`}>
+      <div className={`fixed top-0 left-0 h-full w-80 bg-gray-900 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-              История {getModeTitle(mode)}
+              История {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : 'Текст'}
             </h2>
             <button
               onClick={onClose}
@@ -64,7 +57,7 @@ export default function HistoryPanel({
               </svg>
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {history.length === 0 ? (
               <p className="text-sm text-gray-500 italic">История пуста</p>
@@ -88,7 +81,7 @@ export default function HistoryPanel({
                             {item.prompt}
                           </p>
                           <p className="text-xs text-gray-500 mt-2">
-                            {new Date(item.timestamp).toLocaleDateString('ru-RU', {
+                            {new Date(item.createdAt).toLocaleDateString('ru-RU', {
                               day: '2-digit',
                               month: '2-digit',
                               year: '2-digit',
@@ -97,8 +90,7 @@ export default function HistoryPanel({
                             })}
                           </p>
                         </div>
-                        {item.results?.some(r => r.text) && (
-                          <div className="ml-2 flex-shrink-0">
+                        {Array.isArray(item.results) && item.results.some((r: unknown) => (r as { text?: string; status?: string }).text || (r as { text?: string; status?: string }).status === 'done') && (                          <div className="ml-2 flex-shrink-0">
                             <div className="w-2 h-2 bg-green-500 rounded-full" title="Есть сохраненные результаты" />
                           </div>
                         )}

@@ -31,6 +31,34 @@ export type HistoryItem = {
   model?: string;
 };
 
+export interface ServerHistoryItem {
+  id: string;
+  userId: string;
+  prompt: string;
+  mode: string;
+  model?: string;
+  results?: unknown;
+  createdAt: string;
+}
+
+export interface ApiUser {
+  id: string;
+  name: string;
+  email?: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface ApiToken {
+  id: string;
+  token: string;
+  userId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  expiresAt?: string;
+}
+
 export type Mode = 'text' | 'html' | 'images';
 
 export const PANELS_COUNT = 1;

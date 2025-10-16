@@ -6,10 +6,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // Мы изменили POSTGRES_URL на DATABASE_URL для стандарта
+  url      = env("DATABASE_URL")
 }
 
-// Эта модель User - та, что нужна NextAuth
+// Существующие модели для NextAuth (не трогаем)
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -18,9 +18,9 @@ model User {
   image         String?
   accounts      Account[]
   sessions      Session[]
+  tokens        UserToken[] // Добавить связь с токенами
 }
 
-// Эта модель хранит данные от провайдеров (Telegram, Google и т.д.)
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -40,7 +40,6 @@ model Account {
   @@unique([provider, providerAccountId])
 }
 
-// Эта модель нужна для сессий, если вы используете стратегию "database"
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -49,11 +48,67 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// Эта модель нужна для магии "magic link" входа по email
 model VerificationToken {
   identifier String
   token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// Модель для токенов пользователей (существующая)
+model UserToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  name      String?  // Название токена (опционально)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  expiresAt DateTime? // Опциональная дата истечения
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+}
+
+// НОВЫЕ ТАБЛИЦЫ для токен-авторизации
+model ApiUser {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+  
+  tokens    ApiToken[]
+  histories ApiHistory[]
+}
+
+model ApiToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  name      String?  // Название токена (опционально)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  expiresAt DateTime? // Опциональная дата истечения
+  
+  user ApiUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([token])
+}
+
+// Таблица для истории AI запросов
+model ApiHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  prompt    String
+  mode      String   // 'text', 'html', 'images'
+  model     String?  // Для изображений: 'Imagen 4', 'Flux', etc.
+  results   Json?    // Результаты в JSON формате
+  createdAt DateTime @default(now())
+  
+  user ApiUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([createdAt])
 }
