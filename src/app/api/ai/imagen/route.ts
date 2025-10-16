@@ -255,7 +255,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Преобразуем predictions в формат изображений
-    const images = predictions.map((prediction: any, index: number) => {
+    const images = predictions.map((prediction: {
+      bytesBase64Encoded?: string;
+      mimeType?: string;
+    }, index: number) => {
       console.log(`🖼️ Processing prediction ${index + 1}:`, {
         hasBytes: !!prediction.bytesBase64Encoded,
         hasMimeType: !!prediction.mimeType,
@@ -295,7 +298,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Обработка OPTIONS запросов для CORS
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {

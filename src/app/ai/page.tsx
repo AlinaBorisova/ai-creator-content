@@ -10,6 +10,7 @@ import HistoryPanel from '../components/HistoryPanel';
 import { StreamResult } from '@/app/components/StreamResult';
 import { StreamState } from '@/types/stream';
 import { HistoryItem, PANELS_COUNT } from '@/types/stream';
+import Image from 'next/image';
 
 // Тип для изображения
 interface GeneratedImage {
@@ -73,7 +74,7 @@ export default function AIPage() {
   }, []);
 
   // Функция для генерации изображений через Imagen API
-  const generateImages = useCallback(async (promptText: string): Promise<{images: GeneratedImage[], translation?: any}> => {
+  const generateImages = useCallback(async (promptText: string): Promise<{images: GeneratedImage[], translation?: {original: string, translated: string, language: string, wasTranslated: boolean, hasSlavicPrompts: boolean}}> => {
     try {
       const response = await fetch('/api/ai/imagen', {
         method: 'POST',
@@ -745,10 +746,13 @@ RULES:
 
                                 {/* Изображение */}
                                 <div className="flex-1 flex items-center justify-center">
-                                  <img
+                                  <Image
                                     src={`data:${image.mimeType};base64,${image.imageBytes}`}
                                     alt={`Generated image ${index + 1}-${imgIndex + 1}`}
+                                    width={300}
+                                    height={300}
                                     className="max-w-full max-h-full object-contain rounded"
+                                    unoptimized
                                   />
                                 </div>
                               </div>
