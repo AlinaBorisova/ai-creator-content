@@ -1,11 +1,11 @@
 import React from 'react';
-import { StreamState } from '@/types/stream';
+import { StreamState, Mode } from '@/types/stream';
 import { extractHtmlFromMarkdown } from '@/utils/markdown';
 
 interface StreamResultProps {
   stream: StreamState;
   index: number;
-  mode: 'text' | 'html';
+  mode: Mode;
   isEditing: boolean;
   isCodePanelOpen: boolean;
   iframeHeight: number;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { StreamState, PANELS_COUNT } from '@/types/stream';
+import { StreamState, PANELS_COUNT, Mode } from '@/types/stream';
 
 export const useStreams = () => {
   const [textStreams, setTextStreams] = useState<StreamState[]>(
@@ -8,14 +8,32 @@ export const useStreams = () => {
   const [htmlStreams, setHtmlStreams] = useState<StreamState[]>(
     () => Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' }))
   );
+  const [imageStreams, setImageStreams] = useState<StreamState[]>(
+    () => Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' }))
+  );
 
   const deltaQueue = useRef<Map<number, string>>(new Map());
   const deltaTimeout = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
-  const getStreams = (mode: 'text' | 'html') => mode === 'html' ? htmlStreams : textStreams;
-  const setStreams = (mode: 'text' | 'html') => mode === 'html' ? setHtmlStreams : setTextStreams;
+  const getStreams = (mode: Mode) => {
+    switch (mode) {
+      case 'html': return htmlStreams;
+      case 'text': return textStreams;
+      case 'images': return imageStreams;
+      default: return textStreams;
+    }
+  };
+  
+  const setStreams = (mode: Mode) => {
+    switch (mode) {
+      case 'html': return setHtmlStreams;
+      case 'text': return setTextStreams;
+      case 'images': return setImageStreams;
+      default: return setTextStreams;
+    }
+  };
 
-  const markDone = useCallback((index: number, mode: 'text' | 'html') => {
+  const markDone = useCallback((index: number, mode: Mode) => {
     console.log(`✅ Stream ${index} marked as done`);
 
     const setStreamsFn = setStreams(mode);
@@ -48,7 +66,7 @@ export const useStreams = () => {
     });
   }, []);
 
-  const appendDelta = useCallback((index: number, delta: string, mode: 'text' | 'html') => {
+  const appendDelta = useCallback((index: number, delta: string, mode: Mode) => {
     console.log(`Appending delta to stream ${index}:`, delta.slice(0, 50));
 
     const setStreamsFn = setStreams(mode);
@@ -97,6 +115,7 @@ export const useStreams = () => {
   return {
     textStreams,
     htmlStreams,
+    imageStreams,
     getStreams,
     setStreams,
     markDone,

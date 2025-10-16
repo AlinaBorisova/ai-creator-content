@@ -13,4 +13,6 @@ export type HistoryItem = {
   results?: StreamState[];
 };
 
+export type Mode = 'text' | 'html' | 'images';
+
 export const PANELS_COUNT = 5;

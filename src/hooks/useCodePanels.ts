@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PANELS_COUNT } from '@/types/stream';
+import { PANELS_COUNT, Mode } from '@/types/stream';
 
-export const useCodePanels = (mode: 'text' | 'html', iframeHeights: number[]) => {
+export const useCodePanels = (mode: Mode, iframeHeights: number[]) => {
   const [openCodePanels, setOpenCodePanels] = useState<boolean[]>(
     () => Array.from({ length: PANELS_COUNT }, () => false)
   );

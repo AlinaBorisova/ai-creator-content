@@ -1,24 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-type StreamStatus = 'idle' | 'loading' | 'done' | 'error';
-
-type StreamState = {
-  text: string;
-  status: StreamStatus;
-  error?: string | null;
-};
-
-type HistoryItem = {
-  id: string;
-  prompt: string;
-  timestamp: number;
-  results?: StreamState[];
-};
+import { Mode, HistoryItem } from '@/types/stream';
 
 type HistoryPanelProps = {
-  mode: 'text' | 'html';
+  mode: Mode;
   history: HistoryItem[];
   isOpen: boolean;
   onClose: () => void;
@@ -44,6 +30,15 @@ export default function HistoryPanel({
     return null;
   }
 
+  const getModeTitle = (mode: Mode) => {
+    switch (mode) {
+      case 'html': return 'HTML';
+      case 'text': return 'текста';
+      case 'images': return 'изображений';
+      default: return 'текста';
+    }
+  };
+
   return (
     <>
       {/* Выдвижная панель истории */}
@@ -53,7 +48,7 @@ export default function HistoryPanel({
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-              История {mode === 'html' ? 'HTML' : 'текста'}
+              История {getModeTitle(mode)}
             </h2>
             <button
               onClick={onClose}
