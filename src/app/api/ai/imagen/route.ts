@@ -30,7 +30,7 @@ function hasPeopleInPrompt(text: string): boolean {
 async function translateToEnglish(text: string): Promise<string> {
   try {
     // Используем правильную переменную окружения
-    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
     
     if (!apiKey) {
       console.warn('⚠️ No API key for translation, using original text');
@@ -119,21 +119,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('📝 Request body:', body);
     
-    const { prompt, numberOfImages = 2, imageSize = '1K', aspectRatio = '1:1' } = body;
+    const { prompt, numberOfImages = 1, imageSize = '1K', aspectRatio = '1:1' } = body;
 
     if (!prompt) {
       console.error('❌ No prompt provided');
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
-    // Используем правильную переменную окружения
-    const apiKey = process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    console.log('🎨 Image generation parameters:', {
+      prompt: prompt.slice(0, 50) + '...',
+      numberOfImages,
+      imageSize,
+      aspectRatio
+    });
+
+    const apiKey = process.env.GOOGLE_AI_API_KEY;
     console.log('🔑 API Key check:', {
       exists: !!apiKey,
       length: apiKey?.length || 0,
       startsWith: apiKey?.substring(0, 10) || 'N/A',
-      usingGoogleAI: !!process.env.GOOGLE_AI_API_KEY,
-      usingGemini: !!process.env.GEMINI_API_KEY
+      usingGoogleAI: !!process.env.GOOGLE_AI_API_KEY
     });
 
     if (!apiKey) {

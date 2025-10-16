@@ -37,21 +37,59 @@ export default function AIPage() {
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
 
+  // Добавляем состояние для количества запросов
+  const [requestCount, setRequestCount] = useState<number>(1);
+  const [imageCount, setImageCount] = useState<number>(1);
+
   // Состояние для парсинга промптов в режиме изображений
   const [parsedPrompts, setParsedPrompts] = useState<string[]>([]);
   const [isParsingPrompts, setIsParsingPrompts] = useState(false);
   const [imageResults, setImageResults] = useState<ImageGenerationResult[]>([]);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
 
-  // История запросов для каждого режима
+  // История запросов для каждого режима и модели
   const [textHistory, setTextHistory] = useLocalStorage<HistoryItem[]>('ai-text-history', []);
   const [htmlHistory, setHtmlHistory] = useLocalStorage<HistoryItem[]>('ai-html-history', []);
-  const [imageHistory, setImageHistory] = useLocalStorage<HistoryItem[]>('ai-image-history', []);
+  
+  // Отдельные истории для каждой модели изображений
+  const [imagen4History, setImagen4History] = useLocalStorage<HistoryItem[]>('ai-imagen4-history', []);
+  const [fluxHistory, setFluxHistory] = useLocalStorage<HistoryItem[]>('ai-flux-history', []);
+  const [bananaHistory, setBananaHistory] = useLocalStorage<HistoryItem[]>('ai-banana-history', []);
+  const [ideogramHistory, setIdeogramHistory] = useLocalStorage<HistoryItem[]>('ai-ideogram-history', []);
 
-  // Выбираем активную историю в зависимости от режима
-  const history = mode === 'html' ? htmlHistory : mode === 'text' ? textHistory : imageHistory;
-  const setHistory = mode === 'html' ? setHtmlHistory : mode === 'text' ? setTextHistory : setImageHistory;
+  // Выбираем активную историю в зависимости от режима и модели
+  const getCurrentHistory = useCallback(() => {
+    if (mode === 'html') return htmlHistory;
+    if (mode === 'text') return textHistory;
+    if (mode === 'images') {
+      switch (selectedImageModel) {
+        case 'Imagen 4': return imagen4History;
+        case 'Flux': return fluxHistory;
+        case 'Banana': return bananaHistory;
+        case 'Ideogram': return ideogramHistory;
+        default: return [];
+      }
+    }
+    return [];
+  }, [mode, selectedImageModel, htmlHistory, textHistory, imagen4History, fluxHistory, bananaHistory, ideogramHistory]);
 
+  const getCurrentSetHistory = useCallback(() => {
+    if (mode === 'html') return setHtmlHistory;
+    if (mode === 'text') return setTextHistory;
+    if (mode === 'images') {
+      switch (selectedImageModel) {
+        case 'Imagen 4': return setImagen4History;
+        case 'Flux': return setFluxHistory;
+        case 'Banana': return setBananaHistory;
+        case 'Ideogram': return setIdeogramHistory;
+        default: return () => {};
+      }
+    }
+    return () => {};
+  }, [mode, selectedImageModel, setHtmlHistory, setTextHistory, setImagen4History, setFluxHistory, setBananaHistory, setIdeogramHistory]);
+
+  const history = getCurrentHistory();
+  const setHistory = getCurrentSetHistory();
 
   // Хуки для управления streams
   const { getStreams, setStreams, markDone, appendDelta } = useStreams();
@@ -83,7 +121,7 @@ export default function AIPage() {
         },
         body: JSON.stringify({
           prompt: promptText,
-          numberOfImages: 2,
+          numberOfImages: imageCount, // Используем выбранное количество изображений
           imageSize: '1K',
           aspectRatio: '1:1'
         })
@@ -102,7 +140,7 @@ export default function AIPage() {
       console.error('Error generating images:', error);
       throw error;
     }
-  }, []);
+  }, [imageCount]);
 
   // Функция для обработки режима изображений
   const handleImagesMode = useCallback(async () => {
@@ -176,6 +214,29 @@ export default function AIPage() {
           // Обновляем результаты по мере генерации
           setImageResults([...results]);
         }
+
+        // Сохраняем в соответствующую историю после завершения генерации
+        if (results.length > 0) {
+          const newItem: HistoryItem = {
+            id: Date.now().toString(),
+            prompt: prompt.value,
+            timestamp: Date.now(),
+            imageResults: results.map(r => ({ ...r })),
+            model: selectedImageModel, // Добавляем информацию о модели
+          };
+
+          setHistory(prev => {
+            const exists = prev.some(item => item.prompt === prompt.value);
+            if (exists) {
+              return prev.map(item =>
+                item.prompt === prompt.value
+                  ? { ...item, imageResults: results.map(r => ({ ...r })), timestamp: Date.now() }
+                  : item
+              );
+            }
+            return [newItem, ...prev].slice(0, 20);
+          });
+        }
       } catch (error) {
         console.error('Error in image generation process:', error);
       } finally {
@@ -197,9 +258,30 @@ export default function AIPage() {
         }));
         setImageResults(placeholderResults);
         setIsParsingPrompts(false);
-      }, 1000); // Небольшая задержка для имитации генерации
+
+        // Сохраняем в соответствующую историю и для заглушек
+        const newItem: HistoryItem = {
+          id: Date.now().toString(),
+          prompt: prompt.value,
+          timestamp: Date.now(),
+          imageResults: placeholderResults.map(r => ({ ...r })),
+          model: selectedImageModel || 'Unknown',
+        };
+
+        setHistory(prev => {
+          const exists = prev.some(item => item.prompt === prompt.value);
+          if (exists) {
+            return prev.map(item =>
+              item.prompt === prompt.value
+                ? { ...item, imageResults: placeholderResults.map(r => ({ ...r })), timestamp: Date.now() }
+                : item
+            );
+          }
+          return [newItem, ...prev].slice(0, 20);
+        });
+      }, 1000);
     }
-  }, [prompt, parsePrompts, generateImages, selectedImageModel]);
+  }, [prompt, parsePrompts, generateImages, selectedImageModel, setHistory]);
 
   const downloadImage = useCallback(async (imageBytes: string, mimeType: string, filename: string) => {
     try {
@@ -308,66 +390,58 @@ export default function AIPage() {
       const res = await fetch('/api/ai/gemini/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: p }),
+        body: JSON.stringify({ 
+          prompt: p,
+          requestIndex: index
+        }),
         signal: ctrl.signal,
       });
-
+  
       if (!res.ok) {
-        console.error(`❌ Stream ${index} HTTP error:`, res.status, res.statusText);
         throw new Error(`HTTP error! status: ${res.status}`);
       }
-
-      if (!res.body) {
-        console.error(`❌ Stream ${index} no body`);
-        throw new Error('No response body');
+  
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
       }
-
-      const reader = res.body.getReader();
+  
       const decoder = new TextDecoder();
       let buffer = '';
+  
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-          console.log(`🏁 Stream ${index} completed`);
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const msg = JSON.parse(line);
-            if (msg.delta) {
-              console.log(`📝 Stream ${index} received delta:`, msg.delta.slice(0, 50));
-              await new Promise(resolve => setTimeout(resolve, 10));
-              appendDelta(index, msg.delta, mode);
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const parsed = JSON.parse(line);
+                if (parsed.delta) {
+                  appendDelta(index, parsed.delta, mode);
+                } else if (parsed.done) {
+                  markDone(index, mode);
+                  return;
+                }
+              } catch {
+                console.warn('Failed to parse data:', line);
+              }
             }
-            if (msg.done) {
-              console.log(`✅ Stream ${index} received done signal`);
-              // Добавляем задержку, чтобы все дельты успели обработаться
-              setTimeout(() => {
-                markDone(index, mode);
-              }, 500);
-            }
-          } catch {
-            console.warn(`[Stream ${index}] Invalid JSON line, skipping:`, line.slice(0, 50));
-            continue;
           }
         }
+      } finally {
+        reader.releaseLock();
       }
     } catch (err) {
-      if (ctrl.signal.aborted) {
-        console.log(`❌ Stream ${index} aborted`);
-        return;
-      }
-      const message = err instanceof Error ? err.message : 'Stream error';
-      console.error(`❌ Stream ${index} error:`, message);
+      console.error(`Stream ${index} error:`, err);
       setStreams(mode)(prev => {
         const next = [...prev];
-        next[index] = { ...next[index], status: 'error', error: message };
+        next[index] = { ...next[index], status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
         return next;
       });
     }
@@ -425,15 +499,16 @@ RULES:
       : prompt.value;
 
     console.log('🚀 Setting streams to loading state');
-    setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'loading' })));
-    controllersRef.current = Array.from({ length: PANELS_COUNT }, () => new AbortController());
+    // Используем выбранное количество запросов вместо PANELS_COUNT
+    setStreams(mode)(Array.from({ length: requestCount }, () => ({ text: '', status: 'loading' })));
+    controllersRef.current = Array.from({ length: requestCount }, () => new AbortController());
 
-    console.log('🎬 Starting', PANELS_COUNT, 'streams');
-    for (let i = 0; i < PANELS_COUNT; i++) {
+    console.log('🎬 Starting', requestCount, 'streams');
+    for (let i = 0; i < requestCount; i++) {
       const ctrl = controllersRef.current[i]!;
       startStream(i, finalPrompt, ctrl);
     }
-  }, [prompt, startStream, mode, setStreams, handleImagesMode]);
+  }, [prompt, startStream, mode, setStreams, handleImagesMode, requestCount]);
 
   const saveToHistory = useCallback((promptText: string, results: StreamState[]) => {
     console.log('Saving to history:', promptText, results);
@@ -463,7 +538,12 @@ RULES:
 
     prompt.setValue(item.prompt);
 
-    if (item.results && item.results.length > 0) {
+    if (mode === 'images' && item.imageResults) {
+      // Загружаем результаты изображений
+      setImageResults(item.imageResults);
+      setParsedPrompts(item.imageResults.map(r => r.prompt));
+    } else if (item.results && item.results.length > 0) {
+      // Загружаем результаты text/html
       const paddedResults = Array.from({ length: PANELS_COUNT }, (_, i) => {
         if (i < item.results!.length) {
           return { ...item.results![i] };
@@ -518,6 +598,7 @@ RULES:
             onClose={() => setIsHistoryOpen(false)}
             onLoadFromHistory={loadFromHistory}
             onDeleteFromHistory={deleteFromHistory}
+            selectedModel={selectedImageModel}
           />
 
           {/* Основной контент справа */}
@@ -577,6 +658,48 @@ RULES:
               </div>
             </div>
 
+            {/* Кнопки выбора количества ответов */}
+            <div className="flex gap-2 mb-4">
+              {mode === 'images' ? (
+                // Для режима изображений - количество изображений на промпт
+                <>
+                  <span className="text-sm text-gray-400 self-center mr-2">Изображений на промпт:</span>
+                  {[1, 2, 3, 4].map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => setImageCount(count)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                        imageCount === count
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                // Для режимов text и html - количество запросов
+                <>
+                  <span className="text-sm text-gray-400 self-center mr-2">Количество ответов:</span>
+                  {[1, 2, 3, 4, 5].map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => setRequestCount(count)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                        requestCount === count
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {count}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+
+
             {/* Форма */}
             <form onSubmit={onSubmit} className="flex flex-col items-center sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
@@ -619,10 +742,10 @@ RULES:
                       : isStreaming
                         ? 'Generating...'
                         : mode === 'html'
-                          ? 'Generate HTML'
+                          ? `Generate ${requestCount} HTML${requestCount > 1 ? 's' : ''}`
                           : mode === 'images'
                             ? `Generate ${selectedImageModel || 'Images'}`
-                            : 'Generate'
+                            : `Generate ${requestCount} Text${requestCount > 1 ? 's' : ''}`
                   }
                 </button>
               </div>
@@ -652,13 +775,13 @@ RULES:
                         <p className="text-gray-400 text-sm">{result.prompt}</p>
 
                         {/* Показываем переведенный промпт, если он был переведен */}
-                        {result.translatedPrompt && 
-                         result.wasTranslated && (
-                          <div className="mt-2 p-2 bg-gray-700/50 rounded text-xs">
-                            <div className="text-gray-500 mb-1">🌐 Translated:</div>
-                            <div className="text-gray-300">{result.translatedPrompt}</div>
-                          </div>
-                        )}
+                        {result.translatedPrompt &&
+                          result.wasTranslated && (
+                            <div className="mt-2 p-2 bg-gray-700/50 rounded text-xs">
+                              <div className="text-gray-500 mb-1">🌐 Translated:</div>
+                              <div className="text-gray-300">{result.translatedPrompt}</div>
+                            </div>
+                          )}
                         <div className="mt-2 flex items-center gap-2">
                           <span className={`text-xs px-2 py-1 rounded ${result.status === 'loading'
                             ? 'bg-blue-900/40 text-blue-300'
@@ -691,41 +814,32 @@ RULES:
                         {result.status === 'loading' ? (
                           // Показываем загрузку
                           <>
-                            <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-gray-500">
-                                <div className="animate-spin text-4xl mb-2">⏳</div>
-                                <p className="text-sm">Генерация...</p>
+                            {Array.from({ length: imageCount }, (_, imgIndex) => (
+                              <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                                <div className="text-center text-gray-500">
+                                  <div className="animate-spin text-4xl mb-2">⏳</div>
+                                  <p className="text-sm">Генерация...</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-gray-500">
-                                <div className="animate-spin text-4xl mb-2">⏳</div>
-                                <p className="text-sm">Генерация...</p>
-                              </div>
-                            </div>
+                            ))}
                           </>
                         ) : result.status === 'error' ? (
                           // Показываем ошибку
                           <>
-                            <div className="flex-1 bg-red-900/20 border border-red-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-red-400">
-                                <div className="text-4xl mb-2">❌</div>
-                                <p className="text-sm">Ошибка генерации</p>
-                                <p className="text-xs text-red-500 mt-1">{result.error}</p>
+                            {Array.from({ length: imageCount }, (_, imgIndex) => (
+                              <div key={imgIndex} className="flex-1 bg-red-900/20 border border-red-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                                <div className="text-center text-red-400">
+                                  <div className="text-4xl mb-2">❌</div>
+                                  <p className="text-sm">Ошибка генерации</p>
+                                  <p className="text-xs text-red-500 mt-1">{result.error}</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex-1 bg-red-900/20 border border-red-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-red-400">
-                                <div className="text-4xl mb-2">❌</div>
-                                <p className="text-sm">Ошибка генерации</p>
-                                <p className="text-xs text-red-500 mt-1">{result.error}</p>
-                              </div>
-                            </div>
+                            ))}
                           </>
                         ) : selectedImageModel === 'Imagen 4' ? (
                           // Показываем сгенерированные изображения для Imagen 4
                           <>
-                            {result.images.slice(0, 2).map((image: GeneratedImage, imgIndex: number) => (
+                            {result.images.slice(0, imageCount).map((image: GeneratedImage, imgIndex: number) => (
                               <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-2 flex flex-col min-h-[200px]">
                                 {/* Кнопка скачивания */}
                                 <div className="flex justify-end mb-2">
@@ -745,13 +859,14 @@ RULES:
                                 </div>
 
                                 {/* Изображение */}
-                                <div className="flex-1 flex items-center justify-center">
-                                  <Image
+                                <div className="flex-1 flex items-center justify-center max-h-[500px]">
+                                <Image
                                     src={`data:${image.mimeType};base64,${image.imageBytes}`}
                                     alt={`Generated image ${index + 1}-${imgIndex + 1}`}
-                                    width={300}
-                                    height={300}
                                     className="max-w-full max-h-full object-contain rounded"
+                                    style={{ maxHeight: '500px' }}
+                                    width={500}
+                                    height={500}
                                     unoptimized
                                   />
                                 </div>
@@ -759,38 +874,29 @@ RULES:
                             ))}
                             {result.images.length === 0 && (
                               <>
-                                <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                                  <div className="text-center text-gray-500">
-                                    <div className="text-4xl mb-2">🖼️</div>
-                                    <p className="text-sm">Нет изображений</p>
+                                {Array.from({ length: imageCount }, (_, imgIndex) => (
+                                  <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                                    <div className="text-center text-gray-500">
+                                      <div className="text-4xl mb-2">🖼️</div>
+                                      <p className="text-sm">Нет изображений</p>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                                  <div className="text-center text-gray-500">
-                                    <div className="text-4xl mb-2">🖼️</div>
-                                    <p className="text-sm">Нет изображений</p>
-                                  </div>
-                                </div>
+                                ))}
                               </>
                             )}
                           </>
                         ) : (
                           // Показываем заглушки для других моделей
                           <>
-                            <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-gray-500">
-                                <div className="text-4xl mb-2">🖼️</div>
-                                <p className="text-sm">Изображение #{index + 1}-1</p>
-                                <p className="text-xs text-gray-600 mt-1">Заглушка ({selectedImageModel})</p>
+                            {Array.from({ length: imageCount }, (_, imgIndex) => (
+                              <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                                <div className="text-center text-gray-500">
+                                  <div className="text-4xl mb-2">🖼️</div>
+                                  <p className="text-sm">Изображение #{index + 1}-{imgIndex + 1}</p>
+                                  <p className="text-xs text-gray-600 mt-1">Заглушка ({selectedImageModel})</p>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
-                              <div className="text-center text-gray-500">
-                                <div className="text-4xl mb-2">🖼️</div>
-                                <p className="text-sm">Изображение #{index + 1}-2</p>
-                                <p className="text-xs text-gray-600 mt-1">Заглушка ({selectedImageModel})</p>
-                              </div>
-                            </div>
+                            ))}
                           </>
                         )}
                       </div>
@@ -810,7 +916,7 @@ RULES:
                   </p>
                   {selectedImageModel && (
                     <p className="text-sm text-blue-400 mt-2">
-                      Выбрана модель: {selectedImageModel}
+                      Выбрана модель: {selectedImageModel} | Изображений на промпт: {imageCount}
                     </p>
                   )}
                 </div>

@@ -10,6 +10,7 @@ type HistoryPanelProps = {
   onClose: () => void;
   onLoadFromHistory: (item: HistoryItem) => void;
   onDeleteFromHistory: (id: string) => void;
+  selectedModel?: string | null;
 };
 
 export default function HistoryPanel({ 
@@ -17,8 +18,9 @@ export default function HistoryPanel({
   history, 
   isOpen, 
   onClose, 
-  onLoadFromHistory, 
-  onDeleteFromHistory 
+  onLoadFromHistory,
+  onDeleteFromHistory,
+  selectedModel
 }: HistoryPanelProps) {
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -31,11 +33,14 @@ export default function HistoryPanel({
   }
 
   const getModeTitle = (mode: Mode) => {
+    if (mode === 'images' && selectedModel) {
+      return `История ${selectedModel}`;
+    }
     switch (mode) {
-      case 'html': return 'HTML';
-      case 'text': return 'текста';
-      case 'images': return 'изображений';
-      default: return 'текста';
+      case 'text': return 'История текста';
+      case 'html': return 'История HTML';
+      case 'images': return 'История изображений';
+      default: return 'История';
     }
   };
 
