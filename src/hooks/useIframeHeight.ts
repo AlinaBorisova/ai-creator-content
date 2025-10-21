@@ -18,19 +18,19 @@ export const useIframeHeight = (mode: Mode, streams: StreamState[]) => {
           if (body) {
             body.style.margin = '0';
             body.style.padding = '0';
+            body.style.border = '0';
+            body.style.outline = '0';
           }
           if (html) {
             html.style.margin = '0';
             html.style.padding = '0';
+            html.style.border = '0';
+            html.style.outline = '0';
           }
 
-          // Получаем реальную высоту контента
-          const height = Math.max(
-            body.scrollHeight,
-            body.offsetHeight,
-            html.scrollHeight,
-            html.offsetHeight
-          );
+          const bodyHeight = body.scrollHeight;
+          const htmlHeight = html.scrollHeight;
+          const height = Math.min(bodyHeight, htmlHeight) || 400;
 
           // Устанавливаем высоту iframe по контенту
           iframe.style.height = `${height}px`;
@@ -43,7 +43,7 @@ export const useIframeHeight = (mode: Mode, streams: StreamState[]) => {
           });
 
           console.log(`Iframe ${index} height set to: ${height}px`);
-        }, 200);
+        }, 500);
       }
     } catch (e) {
       console.warn('Cannot access iframe content:', e);

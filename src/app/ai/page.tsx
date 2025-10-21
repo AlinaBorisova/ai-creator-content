@@ -188,7 +188,7 @@ export default function AIPage() {
     } else if (item.results && Array.isArray(item.results) && item.results.length > 0) {
       // Загружаем результаты text/html
       const resultsArray = item.results as StreamState[];
-      const paddedResults = Array.from({ length: PANELS_COUNT }, (_, i) => {
+      const paddedResults = Array.from({ length: Math.max(PANELS_COUNT, resultsArray.length) }, (_, i) => {
         if (i < resultsArray.length) {
           return { ...resultsArray[i] };
         } else {
