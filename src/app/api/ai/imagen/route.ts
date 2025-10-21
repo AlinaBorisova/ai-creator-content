@@ -3,15 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 // Функция для определения языка текста
 function detectLanguage(text: string): 'ru' | 'en' {
   // Более точная проверка на кириллические символы
-  const cyrillicRegex = /[а-яё]/i;
+  const cyrillicRegex = /[а-яёА-ЯЁ]/;
   const hasCyrillic = cyrillicRegex.test(text);
-  
+
   console.log('🔍 Language detection details:', {
     text: text.slice(0, 50) + '...',
     hasCyrillic,
     detected: hasCyrillic ? 'ru' : 'en'
   });
-  
+
   return hasCyrillic ? 'ru' : 'en';
 }
 
@@ -19,9 +19,9 @@ function detectLanguage(text: string): 'ru' | 'en' {
 function hasPeopleInPrompt(text: string): boolean {
   const russianKeywords = ['человек', 'люди', 'мужчина', 'женщина', 'девушка', 'парень', 'ребенок', 'мальчик', 'девочка', 'портрет', 'лицо', 'персона', 'персонаж', 'модель', 'фотограф', 'фото', 'снимок'];
   const englishKeywords = ['person', 'people', 'man', 'woman', 'girl', 'boy', 'child', 'portrait', 'face', 'character', 'model', 'photographer', 'photo', 'shot', 'headshot', 'selfie', 'team', 'professional', 'business', 'owner'];
-  
+
   const allKeywords = [...russianKeywords, ...englishKeywords];
-  return allKeywords.some(keyword => 
+  return allKeywords.some(keyword =>
     text.toLowerCase().includes(keyword.toLowerCase())
   );
 }
@@ -31,7 +31,7 @@ async function translateToEnglish(text: string): Promise<string> {
   try {
     // Используем правильную переменную окружения
     const apiKey = process.env.GOOGLE_AI_API_KEY;
-    
+
     if (!apiKey) {
       console.warn('⚠️ No API key for translation, using original text');
       return text;
@@ -77,21 +77,28 @@ async function translateToEnglish(text: string): Promise<string> {
     const data = await response.json();
     console.log('📊 Translation API response:', JSON.stringify(data, null, 2));
 
+
     const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    
+
     console.log('🔍 Translation result analysis:', {
       original: text,
       translation: translation,
       isDifferent: translation !== text,
       translationLength: translation?.length || 0
     });
-    
-    if (translation && translation !== text && translation.length > 0) {
-      console.log('✅ Translation successful:', {
-        original: text.slice(0, 50) + '...',
-        translated: translation.slice(0, 50) + '...'
-      });
-      return translation;
+
+    if (translation && translation.trim().length > 0) {
+      // Проверяем, что перевод действительно отличается от оригинала
+      if (translation.trim() !== text.trim()) {
+        console.log('✅ Translation successful:', {
+          original: text.slice(0, 50) + '...',
+          translated: translation.slice(0, 50) + '...'
+        });
+        return translation;
+      } else {
+        console.log('⚠️ Translation returned same text as original');
+        return text;
+      }
     } else {
       console.warn('⚠️ Translation returned invalid result, using original text');
       return text;
@@ -108,18 +115,18 @@ function addSlavicPrompts(text: string): string {
     console.log('👥 People detected in prompt, adding Slavic appearance prompts');
     return `${text}, Slavic features, Eastern European appearance, light skin, light eyes, straight nose, round face, soft features`;
   }
-  
+
   return text;
 }
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Imagen API endpoint called');
-    
+
     const body = await request.json();
     console.log('📝 Request body:', body);
-    
-    const { prompt, numberOfImages = 1, imageSize = '1K', aspectRatio = '1:1' } = body;
+
+    const { prompt, numberOfImages = 1, imageSize = '1K', aspectRatio = '1:1', modelVersion = 'imagen-4.0-generate-001' } = body;
 
     if (!prompt) {
       console.error('❌ No prompt provided');
@@ -130,7 +137,8 @@ export async function POST(request: NextRequest) {
       prompt: prompt.slice(0, 50) + '...',
       numberOfImages,
       imageSize,
-      aspectRatio
+      aspectRatio,
+      modelVersion
     });
 
     const apiKey = process.env.GOOGLE_AI_API_KEY;
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       console.error('❌ API key not configured');
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'API key not configured. Please check your .env.local file'
       }, { status: 500 });
     }
@@ -151,10 +159,10 @@ export async function POST(request: NextRequest) {
     // Определяем язык и переводим при необходимости
     const language = detectLanguage(prompt);
     console.log('🌐 Language detected:', language);
-    
+
     let finalPrompt = prompt;
     let wasTranslated = false;
-    
+
     // Переводим только если текст на русском
     if (language === 'ru') {
       console.log('🔄 Translating Russian prompt to English...');
@@ -164,7 +172,7 @@ export async function POST(request: NextRequest) {
         translated: translation,
         isDifferent: translation !== prompt
       });
-      
+
       if (translation !== prompt) {
         finalPrompt = translation;
         wasTranslated = true;
@@ -175,11 +183,11 @@ export async function POST(request: NextRequest) {
     } else {
       console.log('✅ Prompt is already in English');
     }
-    
+
     // Проверяем наличие людей и добавляем славянские подсказки
     const hasPeople = hasPeopleInPrompt(finalPrompt);
     console.log('👥 People detected in final prompt:', hasPeople);
-    
+
     if (hasPeople) {
       const beforeSlavic = finalPrompt;
       finalPrompt = addSlavicPrompts(finalPrompt);
@@ -215,7 +223,7 @@ export async function POST(request: NextRequest) {
     console.log('📤 Sending request to Imagen API:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predict`,
       {
         method: 'POST',
         headers: {

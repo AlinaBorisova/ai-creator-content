@@ -1,31 +1,24 @@
+// src/hooks/useServerHistory.ts
 import { useState, useCallback } from 'react';
 import { ServerHistoryItem } from '@/types/stream';
-//import { ImageGenerationResult } from '@/types/stream';
-//import { StreamState } from '@/types/stream';
-
-// interface ApiHistoryItem {
-//   id: string;
-//   userId: string;
-//   prompt: string;
-//   mode: string;
-//   model?: string;
-//   results?: ServerHistoryItem[] | ImageGenerationResult[] | StreamState[];
-//   createdAt: string;
-// }
 
 export const useServerHistory = (userId: string) => {
   const [history, setHistory] = useState<ServerHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Загрузить историю
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (mode?: string, model?: string) => {
     if (!userId) return;
-
+  
     setLoading(true);
     try {
-      const response = await fetch(`/api/history?userId=${userId}`);
+      const params = new URLSearchParams({ userId });
+      if (mode) params.append('mode', mode);
+      if (model) params.append('model', model);
+      
+      const response = await fetch(`/api/history?${params.toString()}`);
       const data = await response.json();
-      setHistory(data);
+      setHistory(data); // Заменяем историю полностью, а не добавляем
     } catch (error) {
       console.error('Error loading history:', error);
     } finally {
@@ -49,14 +42,13 @@ export const useServerHistory = (userId: string) => {
       });
   
       if (response.ok) {
-        // Обновляем локальную историю
-        const newItem = await response.json();
-        setHistory(prev => [newItem, ...prev]);
+        // Перезагружаем историю с сервера с теми же параметрами
+        loadHistory(mode, model);
       }
     } catch (error) {
       console.error('Error saving to history:', error);
     }
-  }, [userId]);
+  }, [userId, loadHistory]);
 
   // Удалить из истории
   const deleteFromHistory = useCallback(async (id: string) => {
@@ -64,20 +56,41 @@ export const useServerHistory = (userId: string) => {
       const response = await fetch(`/api/history/${id}`, {
         method: 'DELETE'
       });
-
+  
       if (response.ok) {
-        setHistory(prev => prev.filter(item => item.id !== id));
+        // Перезагружаем историю с сервера вместо локального обновления
+        loadHistory();
       }
     } catch (error) {
       console.error('Error deleting from history:', error);
     }
-  }, []);
+  }, [loadHistory]);
+
+  const clearHistory = useCallback(async (mode?: string, model?: string) => {
+    try {
+      const params = new URLSearchParams({ userId });
+      if (mode) params.append('mode', mode);
+      if (model) params.append('model', model);
+      
+      const response = await fetch(`/api/history/clear?${params.toString()}`, {
+        method: 'DELETE'
+      });
+  
+      if (response.ok) {
+        // Перезагружаем историю с сервера вместо локального обновления
+        loadHistory(mode, model);
+      }
+    } catch (error) {
+      console.error('Error clearing history:', error);
+    }
+  }, [userId, loadHistory]);
 
   return {
     history,
     loading,
     loadHistory,
     saveToHistory,
-    deleteFromHistory
+    deleteFromHistory,
+    clearHistory
   };
 };

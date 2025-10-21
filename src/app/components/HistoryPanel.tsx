@@ -11,6 +11,7 @@ type HistoryPanelProps = {
   onClose: () => void;
   onLoadFromHistory: (item: ServerHistoryItem) => void;
   onDeleteFromHistory: (id: string) => void;
+  onClearHistory: () => void;
 };
 
 export default function HistoryPanel({
@@ -19,7 +20,8 @@ export default function HistoryPanel({
   isOpen,
   onClose,
   onLoadFromHistory,
-  onDeleteFromHistory
+  onDeleteFromHistory,
+  onClearHistory
 }: HistoryPanelProps) {
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -30,13 +32,6 @@ export default function HistoryPanel({
   if (!isHydrated) {
     return null;
   }
-
-  // const getModeTitle = (item: ServerHistoryItem) => {
-  //   if (item.mode === 'images') {
-  //     return `Изображения${item.model ? ` (${item.model})` : ''}`;
-  //   }
-  //   return item.mode === 'html' ? 'HTML' : 'Текст';
-  // };
 
   return (
     <>
@@ -56,7 +51,31 @@ export default function HistoryPanel({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+
           </div>
+
+          {/* Кнопка очистки истории */}
+          {history.length > 0 && (
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    if (confirm(`Очистить всю историю ${mode === 'images' ? 'изображений' : mode === 'html' ? 'HTML' : 'текста'}?`)) {
+                      onClearHistory();
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-red-900/50 hover:bg-red-900 text-red-300 rounded-lg text-sm font-medium transition-colors"
+                >
+                  🗑️ Очистить историю
+                </button>
+              </div>
+            )}
+
+          {/* Отображение модели для изображений */}
+          {mode === 'images' && history.length > 0 && (
+            <div className="mb-4 text-sm text-gray-400">
+              Модель: {history[0]?.model || 'Не указана'}
+            </div>
+          )}
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             {history.length === 0 ? (
@@ -90,9 +109,9 @@ export default function HistoryPanel({
                             })}
                           </p>
                         </div>
-                        {Array.isArray(item.results) && item.results.some((r: unknown) => (r as { text?: string; status?: string }).text || (r as { text?: string; status?: string }).status === 'done') && (                          <div className="ml-2 flex-shrink-0">
-                            <div className="w-2 h-2 bg-green-500 rounded-full" title="Есть сохраненные результаты" />
-                          </div>
+                        {Array.isArray(item.results) && item.results.some((r: unknown) => (r as { text?: string; status?: string }).text || (r as { text?: string; status?: string }).status === 'done') && (<div className="ml-2 flex-shrink-0">
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Есть сохраненные результаты" />
+                        </div>
                         )}
                       </div>
                     </button>
