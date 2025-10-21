@@ -10,7 +10,7 @@ interface PromptFormProps {
     error?: string;
     touched: boolean;
   };
-  mode: 'text' | 'html' | 'images';
+  mode: 'text' | 'html' | 'images' | 'videos';
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isStreaming: boolean;
   isParsingPrompts: boolean;
@@ -37,10 +37,12 @@ export function PromptForm({
           id="prompt"
           placeholder={
             mode === 'html'
-              ? 'Describe the HTML page you want...'
+              ? 'Опишите HTML страницу, которую вы хотите получить...'
               : mode === 'images'
-                ? 'Введите несколько промптов для изображений, разделенных абзацами...'
-                : 'Enter your prompt'
+                ? 'Введите промпт или несколько промптов для изображений, разделенных абзацами...'
+                : mode === 'videos'
+                ? 'Введите промпт или несколько промптов для видео, разделенных абзацами...'
+                : 'Введите ваш промпт...'
           }
           className="w-full border border-gray-700 rounded-lg px-4 py-4 min-h-[250px] sm:min-h-[120px] bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 custom-scrollbar"
           value={prompt.value}
@@ -65,16 +67,18 @@ export function PromptForm({
           disabled={!prompt.canSubmit || isStreaming || isParsingPrompts || isGeneratingImages}
         >
           {isParsingPrompts
-            ? 'Parsing...'
+            ? 'Парсинг...'
             : isGeneratingImages
-              ? 'Generating Images...'
+              ? 'Генерация изображений...'
               : isStreaming
-                ? 'Generating...'
+                ? 'Генерация...'
                 : mode === 'html'
-                  ? `Generate ${requestCount} HTML${requestCount > 1 ? 's' : ''}`
+                  ? `Генерация ${requestCount} HTML${requestCount > 1 ? 's' : ''}`
                   : mode === 'images'
-                    ? `Generate ${selectedImageModel || 'Images'}`
-                    : `Generate ${requestCount} Text${requestCount > 1 ? 's' : ''}`
+                    ? `Генерация ${selectedImageModel || 'Изображения'}`
+                  : mode === 'videos'
+                    ? `Генерация ${selectedImageModel || 'Видео'}`
+                    : `Генерация ${requestCount} Текст${requestCount > 1 ? 's' : ''}`
           }
         </button>
       </div>

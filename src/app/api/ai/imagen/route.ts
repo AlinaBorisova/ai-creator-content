@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Функция для определения языка текста
-function detectLanguage(text: string): 'ru' | 'en' {
+export function detectLanguage(text: string): 'ru' | 'en' {
   // Более точная проверка на кириллические символы
   const cyrillicRegex = /[а-яёА-ЯЁ]/;
   const hasCyrillic = cyrillicRegex.test(text);
@@ -16,7 +16,7 @@ function detectLanguage(text: string): 'ru' | 'en' {
 }
 
 // Функция для проверки наличия людей в промпте (универсальная для обоих языков)
-function hasPeopleInPrompt(text: string): boolean {
+export function hasPeopleInPrompt(text: string): boolean {
   const russianKeywords = ['человек', 'люди', 'мужчина', 'женщина', 'девушка', 'парень', 'ребенок', 'мальчик', 'девочка', 'портрет', 'лицо', 'персона', 'персонаж', 'модель', 'фотограф', 'фото', 'снимок'];
   const englishKeywords = ['person', 'people', 'man', 'woman', 'girl', 'boy', 'child', 'portrait', 'face', 'character', 'model', 'photographer', 'photo', 'shot', 'headshot', 'selfie', 'team', 'professional', 'business', 'owner'];
 
@@ -27,7 +27,7 @@ function hasPeopleInPrompt(text: string): boolean {
 }
 
 // Функция для перевода текста с русского на английский
-async function translateToEnglish(text: string): Promise<string> {
+export async function translateToEnglish(text: string): Promise<string> {
   try {
     // Используем правильную переменную окружения
     const apiKey = process.env.GOOGLE_AI_API_KEY;
@@ -54,11 +54,30 @@ async function translateToEnglish(text: string): Promise<string> {
             }]
           }],
           generationConfig: {
-            temperature: 0.3,
+            temperature: 0.1, // Уменьшить для более стабильного перевода
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1000,
-          }
+            maxOutputTokens: 2000, // Уменьшить, так как нужен только перевод
+            stopSequences: [] // Добавить пустые стоп-последовательности
+          },
+          safetySettings: [ // Добавить настройки безопасности
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH", 
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
         })
       }
     );
@@ -87,6 +106,16 @@ async function translateToEnglish(text: string): Promise<string> {
       translationLength: translation?.length || 0
     });
 
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('❌ No candidates in translation response:', data);
+      return text;
+    }
+    
+    if (!data.candidates[0]?.content?.parts?.[0]?.text) {
+      console.error('❌ No text content in translation response:', data);
+      return text;
+    }
+
     if (translation && translation.trim().length > 0) {
       // Проверяем, что перевод действительно отличается от оригинала
       if (translation.trim() !== text.trim()) {
@@ -110,7 +139,7 @@ async function translateToEnglish(text: string): Promise<string> {
 }
 
 // Функция для добавления подсказок славянской внешности
-function addSlavicPrompts(text: string): string {
+export function addSlavicPrompts(text: string): string {
   if (hasPeopleInPrompt(text)) {
     console.log('👥 People detected in prompt, adding Slavic appearance prompts');
     return `${text}, Slavic features, Eastern European appearance, light skin, light eyes, straight nose, round face, soft features`;

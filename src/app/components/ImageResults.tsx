@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { ImageGenerationResult } from '@/types/stream';
+import { ErrorIcon, ImageIcon, SpinnerIcon } from './Icons';
 
 interface ImageResultsProps {
   imageResults: ImageGenerationResult[];
@@ -45,12 +46,12 @@ export function ImageResults({
             )}
             <div className="mt-2 flex items-center gap-2">
               <span className={`text-xs px-2 py-1 rounded ${result.status === 'loading'
-                  ? 'bg-blue-900/40 text-blue-300'
-                  : result.status === 'done'
-                    ? 'bg-green-900/30 text-green-300'
-                    : result.status === 'error'
-                      ? 'bg-red-900/30 text-red-300'
-                      : 'bg-gray-700 text-gray-300'
+                ? 'bg-blue-900/40 text-blue-300'
+                : result.status === 'done'
+                  ? 'bg-green-900/30 text-green-300'
+                  : result.status === 'error'
+                    ? 'bg-red-900/30 text-red-300'
+                    : 'bg-gray-700 text-gray-300'
                 }`}>
                 {result.status === 'loading' ? 'Генерация...' :
                   result.status === 'done' ? 'Готово' :
@@ -77,7 +78,9 @@ export function ImageResults({
                 {Array.from({ length: imageCount }, (_, imgIndex) => (
                   <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                     <div className="text-center text-gray-500">
-                      <div className="animate-spin text-4xl mb-2">⏳</div>
+                      <div className="animate-spin text-4xl mb-2">
+                        <SpinnerIcon className="w-12 h-12 mx-auto text-blue-400" />
+                      </div>
                       <p className="text-sm">Генерация...</p>
                     </div>
                   </div>
@@ -88,7 +91,7 @@ export function ImageResults({
                 {Array.from({ length: imageCount }, (_, imgIndex) => (
                   <div key={imgIndex} className="flex-1 bg-red-900/20 border border-red-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                     <div className="text-center text-red-400">
-                      <div className="text-4xl mb-2">❌</div>
+                      <ErrorIcon className="w-12 h-12 mx-auto text-red-400" />
                       <p className="text-sm">Ошибка генерации</p>
                       <p className="text-xs text-red-500 mt-1">{result.error}</p>
                     </div>
@@ -135,7 +138,7 @@ export function ImageResults({
                     {Array.from({ length: imageCount }, (_, imgIndex) => (
                       <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                         <div className="text-center text-gray-500">
-                          <div className="text-4xl mb-2">🖼️</div>
+                          <ImageIcon className="w-12 h-12 mx-auto text-blue-400" />
                           <p className="text-sm">Нет изображений</p>
                         </div>
                       </div>
@@ -148,7 +151,7 @@ export function ImageResults({
                 {Array.from({ length: imageCount }, (_, imgIndex) => (
                   <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                     <div className="text-center text-gray-500">
-                      <div className="text-4xl mb-2">🖼️</div>
+                      <ImageIcon className="w-12 h-12 mx-auto text-blue-400" />
                       <p className="text-sm">Изображение #{index + 1}-{imgIndex + 1}</p>
                       <p className="text-xs text-gray-600 mt-1">Заглушка ({selectedImageModel})</p>
                     </div>

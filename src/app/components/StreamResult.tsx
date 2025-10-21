@@ -1,6 +1,7 @@
 import React from 'react';
 import { StreamState, Mode } from '@/types/stream';
 import { extractHtmlFromMarkdown } from '@/utils/markdown';
+import { CheckIcon, EditIcon, CopyIcon, CancelIcon } from './Icons';
 
 interface StreamResultProps {
   stream: StreamState;
@@ -100,7 +101,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
                   >
                     <div className="bg-gray-800 rounded p-3 border border-gray-700 h-full">
                       {stream.status === 'error' ? (
-                        <p className="text-red-300 text-sm">{stream.error ?? 'Error'}</p>
+                        <p className="text-red-300 text-sm">{stream.error ?? 'Ошибка'}</p>
                       ) : isEditing ? (
                         <textarea
                           value={stream.text}
@@ -110,7 +111,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
                         />
                       ) : (
                         <pre className="text-sm text-gray-300 whitespace-pre-wrap break-words h-full overflow-auto">
-                          {stream.text || (stream.status === 'loading' ? 'Generating…' : 'No code yet')}
+                          {stream.text || (stream.status === 'loading' ? 'Генерация...' : 'Код еще не готов')}
                         </pre>
                       )}
                     </div>
@@ -145,7 +146,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
                       <div className="flex items-center justify-center text-gray-400 text-sm">
                         <p className="text-center px-4">
                           {stream.status === 'loading' ? (
-                            'Waiting for HTML block...'
+                            'Ожидание HTML блока...'
                           ) : (
                             <>
                               No HTML code block found.<br />
@@ -158,7 +159,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
                   })()
                 ) : (
                   <div className="flex items-center justify-center h-[400px] text-gray-400 text-sm">
-                    {stream.status === 'loading' ? 'Preview loading...' : 'No preview yet'}
+                    {stream.status === 'loading' ? 'Загрузка превью...' : 'No preview yet'}
                   </div>
                 )}
               </div>
@@ -169,7 +170,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
         // Text режим
         <div className="flex-1 overflow-auto min-h-[200px]">
           {stream.status === 'error' ? (
-            <p className="text-red-300">{stream.error ?? 'Error'}</p>
+            <p className="text-red-300">{stream.error ?? 'Ошибка'}</p>
           ) : isEditing ? (
             <textarea
               value={stream.text}
@@ -179,7 +180,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
             />
           ) : (
             <div className="whitespace-pre-wrap break-words text-sm text-gray-100">
-              {stream.text || (stream.status === 'loading' ? 'Generating…' : 'No content yet')}
+              {stream.text || (stream.status === 'loading' ? 'Генерация...' : 'No content yet')}
             </div>
           )}
         </div>
@@ -194,27 +195,37 @@ export const StreamResult: React.FC<StreamResultProps> = ({
             : 'bg-gray-700 hover:bg-gray-600'
             } text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60`}
           disabled={!stream.text || stream.status === 'loading'}
-          title={isEditing ? 'Finish editing' : 'Edit text'}
+          title={isEditing ? 'Завершить редактирование' : 'Редактировать текст'}
         >
-          {isEditing ? '✓ Done' : '✏️ Edit'}
+          {isEditing ? (
+            <div className="flex items-center gap-1">
+              <CheckIcon className="w-4 h-4" />
+              Done
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <EditIcon className="w-4 h-4" />
+              Edit
+            </div>
+          )}
         </button>
         <button
           type="button"
           onClick={() => onCopyToClipboard(index)}
-          className="bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
+          className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
           disabled={!stream.text}
           title="Copy to clipboard"
         >
-          📋 Copy
+          <CopyIcon className="w-4 h-4" /> Копировать
         </button>
         <button
           type="button"
           onClick={() => onAbort(index)}
-          className="bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
+          className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
           disabled={stream.status !== 'loading'}
-          title="Cancel this stream"
+          title="Отменить этот поток"
         >
-          ✕ Cancel
+          <CancelIcon className="w-4 h-4" /> Отменить
         </button>
       </div>
     </div>

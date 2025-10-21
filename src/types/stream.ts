@@ -16,6 +16,35 @@ export interface GeneratedImage {
   index?: number;
 }
 
+export interface ReferenceImage {
+  file: File;
+  preview: string;
+  name: string;
+  size: number;
+}
+
+export interface VideoGenerationResult {
+  prompt: string;
+  video: GeneratedVideo;
+  status: 'idle' | 'loading' | 'done' | 'error';
+  error?: string;
+  translatedPrompt?: string;
+  hasSlavicPrompts?: boolean;
+  wasTranslated?: boolean;
+  referenceImages?: ReferenceImage[];
+}
+
+export interface GeneratedVideo {
+  videoBytes: string;
+  mimeType: string;
+  duration: number;
+  resolution: string;
+  aspectRatio: string;
+  index?: number;
+}
+
+export type VideoGenerationMode = 'text-to-video' | 'image-to-video';
+
 export type StreamState = {
   text: string;
   status: StreamStatus;
@@ -28,7 +57,9 @@ export type HistoryItem = {
   timestamp: number;
   results?: StreamState[];
   imageResults?: ImageGenerationResult[];
+  videoResults?: VideoGenerationResult[];
   model?: string;
+  referenceImages?: ReferenceImage[];
 };
 
 export interface ServerHistoryItem {
@@ -59,6 +90,6 @@ export interface ApiToken {
   expiresAt?: string;
 }
 
-export type Mode = 'text' | 'html' | 'images';
+export type Mode = 'text' | 'html' | 'images' | 'videos';
 
 export const PANELS_COUNT = 1;

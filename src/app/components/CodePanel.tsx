@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CheckIcon, EditIcon } from './Icons';
 
 type StreamStatus = 'idle' | 'loading' | 'done' | 'error';
 
@@ -20,14 +21,14 @@ type CodePanelProps = {
   isEditing: boolean;
 };
 
-export default function CodePanel({ 
-  stream, 
-  index, 
-  isOpen, 
-  onClose, 
-  onToggleEdit, 
-  onUpdateText, 
-  isEditing 
+export default function CodePanel({
+  stream,
+  index,
+  isOpen,
+  onClose,
+  onToggleEdit,
+  onUpdateText,
+  isEditing
 }: CodePanelProps) {
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -42,9 +43,8 @@ export default function CodePanel({
   return (
     <>
       {/* Выдвижная панель с кодом */}
-      <div className={`fixed top-0 right-0 h-full w-96 bg-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${
-        isOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
+      <div className={`fixed top-0 right-0 h-full w-96 bg-gray-900 border-l border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}>
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
@@ -59,11 +59,11 @@ export default function CodePanel({
               </svg>
             </button>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="bg-gray-800 rounded p-4 border border-gray-700 h-full">
               {stream.status === 'error' ? (
-                <p className="text-red-300 text-sm">{stream.error ?? 'Error'}</p>
+                <p className="text-red-300 text-sm">{stream.error ?? 'Ошибка'}</p>
               ) : isEditing ? (
                 <textarea
                   value={stream.text}
@@ -73,7 +73,7 @@ export default function CodePanel({
                 />
               ) : (
                 <pre className="text-sm text-gray-300 whitespace-pre-wrap break-words h-full overflow-auto">
-                  {stream.text || (stream.status === 'loading' ? 'Generating…' : 'No code yet')}
+                  {stream.text || (stream.status === 'loading' ? 'Генерация...' : 'Код еще не готов')}
                 </pre>
               )}
             </div>
@@ -87,9 +87,19 @@ export default function CodePanel({
                 : 'bg-gray-700 hover:bg-gray-600'
                 } text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60`}
               disabled={!stream.text || stream.status === 'loading'}
-              title={isEditing ? 'Finish editing' : 'Edit text'}
+              title={isEditing ? 'Завершить редактирование' : 'Редактировать текст'}
             >
-              {isEditing ? '✓ Done' : '✏️ Edit'}
+              {isEditing ? (
+                <div className="flex items-center gap-1">
+                  <CheckIcon className="w-4 h-4" />
+                  Done
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <EditIcon className="w-4 h-4" />
+                  Edit
+                </div>
+              )}
             </button>
           </div>
         </div>

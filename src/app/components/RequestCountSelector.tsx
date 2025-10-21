@@ -1,5 +1,5 @@
 interface RequestCountSelectorProps {
-  mode: 'text' | 'html' | 'images';
+  mode: 'text' | 'html' | 'images' | 'videos';
   requestCount: number;
   imageCount: number;
   onRequestCountChange: (count: number) => void;
@@ -31,6 +31,22 @@ export function RequestCountSelector({
             </button>
           ))}
         </>
+        ) : mode === 'videos' ? (
+          <>
+            <span className="text-sm text-gray-400 self-center mr-2">Видео на промпт:</span>
+            {[1, 2, 3, 4].map((count) => (
+              <button
+                key={count}
+                onClick={() => onImageCountChange(count)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imageCount === count
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+              >
+                {count}
+              </button>
+            ))}
+          </>
       ) : (
         <>
           <span className="text-sm text-gray-400 self-center mr-2">Количество ответов:</span>

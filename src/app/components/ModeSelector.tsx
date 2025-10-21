@@ -1,11 +1,18 @@
+import { TextIcon, ImageIcon, VideoIcon, GlobeIcon } from './Icons';
+
 interface ModeSelectorProps {
-  mode: 'text' | 'html' | 'images';
-  onModeChange: (mode: 'text' | 'html' | 'images') => void;
+  mode: 'text' | 'html' | 'images' | 'videos';
+  onModeChange: (mode: 'text' | 'html' | 'images' | 'videos') => void;
   selectedImageModel: string | null;
   onImageModelChange: (model: string | null) => void;
   isImagesDropdownOpen: boolean;
   onImagesDropdownToggle: () => void;
   imageModels: string[];
+  //videoModels: string[];
+  //selectedVideoModel: string | null;
+  //onVideoModelChange: (model: string | null) => void;
+  //isVideosDropdownOpen: boolean;
+  //onVideosDropdownToggle: () => void;
 }
 
 export function ModeSelector({
@@ -15,37 +22,42 @@ export function ModeSelector({
   onImageModelChange,
   isImagesDropdownOpen,
   onImagesDropdownToggle,
-  imageModels
+  imageModels,
+  //videoModels,
+  //selectedVideoModel,
+  //onVideoModelChange,
+  //isVideosDropdownOpen,
+  //onVideosDropdownToggle
 }: ModeSelectorProps) {
   return (
     <div className="flex gap-2 mb-4">
       <button
         onClick={() => onModeChange('html')}
-        className={`px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'html'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'html'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
           }`}
       >
-        🌐 HTML Preview
+        <GlobeIcon className="w-4 h-4" /> HTML
       </button>
       <button
         onClick={() => onModeChange('text')}
-        className={`px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'text'
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'text'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
           }`}
       >
-        📝 Text
+        <TextIcon className="w-4 h-4" /> Текст
       </button>
       <div className="relative">
         <button
           onClick={onImagesDropdownToggle}
-          className={`px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'images'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'images'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
         >
-          🖼️ {selectedImageModel || 'Images'}
+          <ImageIcon className="w-4 h-4" /> {selectedImageModel || 'Изображения'}
         </button>
         {isImagesDropdownOpen && (
           <div className="absolute top-full left-0 mt-1 bg-gray-700 rounded-lg shadow-lg z-50 min-w-[120px]">
@@ -66,6 +78,15 @@ export function ModeSelector({
           </div>
         )}
       </div>
+      <button
+        onClick={() => onModeChange('videos')}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'videos'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+      >
+        <VideoIcon className="w-4 h-4" /> Veo 3.1
+      </button>
     </div>
   );
 }

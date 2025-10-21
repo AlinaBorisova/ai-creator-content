@@ -21,20 +21,32 @@ import { HistoryButton } from '../components/HistoryButton';
 import { LoadingScreen } from '../components/LoadingScreen';
 import { AccessDeniedScreen } from '../components/AccessDeniedScreen';
 import { downloadImage, copyPromptToClipboard } from '@/utils/imageUtils';
+import { downloadVideo } from '@/utils/videoUtils';
+import { useVideoState } from '@/hooks/useVideoState';
+import { useVideoGeneration } from '@/hooks/useVideoGeneration';
+import { VideoSettings } from '../components/VideoSettings';
+import { VideoResults } from '../components/VideoResults';
+import { ImageIcon, VideoIcon } from '../components/Icons';
 
 export default function AIPage() {
   const { user, loading } = useAuth();
   const prompt = usePromptInput({ minLen: 5, maxLen: 50000 });
-  const [mode, setMode] = useState<'text' | 'html' | 'images'>('html');
+  const [mode, setMode] = useState<'text' | 'html' | 'images' | 'videos'>('html');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
   const [currentPromptValue, setCurrentPromptValue] = useState<string>('');
+  //const [isVideosDropdownOpen, setIsVideosDropdownOpen] = useState(false);
+  const [selectedVideoModel] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState<number>(1);
+  //const videoModels = ['Veo 3.1', 'Veo 3.1 Fast'];
+
 
   // Кастомные хуки
   const imageState = useImageState();
   const imageGeneration = useImageGeneration();
+  const videoState = useVideoState();
+  const videoGeneration = useVideoGeneration();
 
   // Получаем пользователя и серверную историю
   const { history: serverHistory, loadHistory, saveToHistory, deleteFromHistory, clearHistory } = useServerHistory(user?.id || '');
@@ -64,6 +76,7 @@ export default function AIPage() {
   // Флаг для отслеживания сохранения результатов
   const hasSavedRef = useRef(false);
   const hasSavedImagesRef = useRef(false);
+  const hasSavedVideosRef = useRef(false);
 
   const isStreaming = useMemo(
     () => streams.some(s => s.status === 'loading'),
@@ -256,6 +269,18 @@ export default function AIPage() {
       return;
     }
 
+    if (mode === 'videos') {
+      videoGeneration.handleVideosMode(
+        prompt.value,
+        'Veo 3.1',
+        videoState.resolution,
+        'veo-3.1-generate-preview',
+        videoState.referenceImages,
+        prompt.setError
+      );
+      return;
+    }
+
     // Логика для text/html режимов
     const finalPrompt = mode === 'html'
       ? `${prompt.value}
@@ -297,7 +322,45 @@ RULES:
     }
 
     prompt.reset();
-  }, [prompt, startStream, mode, setStreams, imageGeneration, selectedImageModel, imageState, requestCount]);
+  }, [
+    imageGeneration,
+    imageState.aspectRatio,
+    imageState.imageCount,
+    imageState.imageSize,
+    imageState.imagenModel,
+    mode,
+    prompt,
+    requestCount,
+    selectedImageModel,
+    setStreams,
+    startStream,
+    videoGeneration,
+    videoState.referenceImages,
+    videoState.resolution
+  ]);
+
+  const onImageToVideoSubmit = useCallback(() => {
+    if (!videoState.startingImage) {
+      prompt.setError('Выберите стартовое изображение');
+      return;
+    }
+
+    if (!prompt.canSubmit) {
+      prompt.setTouched(true);
+      prompt.setError('Введите корректный промпт');
+      return;
+    }
+
+    // Вызываем логику генерации видео
+    videoGeneration.handleVideosMode(
+      prompt.value,
+      'Veo 3.1',
+      videoState.resolution,
+      'veo-3.1-generate-preview',
+      videoState.referenceImages,
+      prompt.setError
+    );
+  }, [videoState, prompt, videoGeneration]);
 
   // Автоматически сохраняем результаты в историю после завершения генерации
   useEffect(() => {
@@ -320,6 +383,25 @@ RULES:
       } else if (!allDone) {
         hasSavedImagesRef.current = false;
       }
+    } else if (mode === 'videos') {
+      // Для режима видео - новая логика
+      const allDone = videoGeneration.videoResults.every(result => result.status === 'done' || result.status === 'error');
+      const hasContent = videoGeneration.videoResults.some(result => result.video.videoBytes);
+
+      if (allDone && hasContent && videoGeneration.videoResults.length > 0 && !hasSavedVideosRef.current) {
+        hasSavedVideosRef.current = true;
+        console.log('🎬 Saving video results to server history:', videoGeneration.videoResults);
+
+        // Сохраняем в серверную историю
+        saveToHistory(
+          prompt.value, // Используем оригинальный промпт
+          'videos',
+          'Veo 3.1',
+          videoGeneration.videoResults
+        );
+      } else if (!allDone) {
+        hasSavedVideosRef.current = false;
+      }
     } else {
       // Для режимов text и html - логика сохранения
       const streams = getStreams(mode);
@@ -336,7 +418,7 @@ RULES:
         hasSavedRef.current = false;
       }
     }
-  }, [imageGeneration.imageResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef]);
+  }, [imageGeneration.imageResults, videoGeneration.videoResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef, hasSavedVideosRef]);
 
   // useEffect для загрузки истории по режиму
   useEffect(() => {
@@ -345,15 +427,29 @@ RULES:
       if (mode === 'images' && !selectedImageModel) {
         return; // Не загружаем историю, если модель не выбрана
       }
-      const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
+      // Для режима видео загружаем историю только если выбрана модель
+      const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) :
+        mode === 'videos' ? 'Veo 3.1' : undefined;
       loadHistory(mode, modelToLoad);
     }
-  }, [user?.id, mode, selectedImageModel, loadHistory]);
+  }, [user?.id, mode, selectedImageModel, selectedVideoModel, loadHistory]);
 
   useEffect(() => {
     // Сбрасываем выбранную модель изображений при переключении на text/html режимы
     if (mode !== 'images' && selectedImageModel !== null) {
       setSelectedImageModel(null);
+    }
+    // Для режима видео модель не сбрасываем, так как она фиксированная
+
+    // Сбрасываем флаги сохранения при смене режима
+    if (mode !== 'images') {
+      hasSavedImagesRef.current = false;
+    }
+    if (mode !== 'videos') {
+      hasSavedVideosRef.current = false;
+    }
+    if (mode !== 'text' && mode !== 'html') {
+      hasSavedRef.current = false;
     }
   }, [mode, selectedImageModel]);
 
@@ -409,32 +505,74 @@ RULES:
               />
             )}
 
-            <PromptForm
-              prompt={{
-                ...prompt,
-                error: prompt.error || undefined
-              }}
-              mode={mode}
-              onSubmit={onSubmit}
-              isStreaming={isStreaming}
-              isParsingPrompts={imageGeneration.isParsingPrompts}
-              isGeneratingImages={imageGeneration.isGeneratingImages}
-              requestCount={requestCount}
-              selectedImageModel={selectedImageModel}
-            />
+            {mode === 'videos' && (
+              <VideoSettings
+                generationMode={videoState.generationMode}
+                resolution={videoState.resolution}
+                aspectRatio={videoState.aspectRatio}
+                //referenceImages={videoState.referenceImages}
+                startingImage={videoState.startingImage}
+                onModeChange={videoState.setGenerationMode}
+                onResolutionChange={videoState.setResolution}
+                onAspectRatioChange={videoState.setAspectRatio}
+                onAddReferenceImage={videoState.addReferenceImage}
+                onRemoveReferenceImage={videoState.removeReferenceImage}
+                onClearReferenceImages={videoState.clearReferenceImages}
+                onSetStartingImage={videoState.setStartingImageFile}
+                onClearStartingImage={videoState.clearStartingImage}
+              />
+            )}
+
+            {/* Показываем PromptForm только для текстового режима или других режимов */}
+            {(mode !== 'videos' || videoState.generationMode === 'text-to-video') && (
+              <PromptForm
+                prompt={{
+                  ...prompt,
+                  error: prompt.error || undefined
+                }}
+                mode={mode}
+                onSubmit={onSubmit}
+                isStreaming={isStreaming}
+                isParsingPrompts={imageGeneration.isParsingPrompts}
+                isGeneratingImages={imageGeneration.isGeneratingImages}
+                requestCount={requestCount}
+                selectedImageModel={selectedImageModel}
+              />
+            )}
+
+            {mode === 'videos' && videoState.generationMode === 'image-to-video' && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    if (!videoState.startingImage) {
+                      prompt.setError('Выберите стартовое изображение');
+                      return;
+                    }
+                    onImageToVideoSubmit();
+                  }}
+                  disabled={!videoState.startingImage || isStreaming}
+                  className={`px-6 py-3 rounded-lg font-medium transition-colors ${!videoState.startingImage || isStreaming
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                >
+                  {isStreaming ? 'Генерация...' : 'Сгенерировать видео'}
+                </button>
+              </div>
+            )}
 
             <div className="w-full flex flex-col gap-4 mt-8">
-            {mode === 'images' && imageGeneration.imageResults.length > 0 ? (
+              {mode === 'images' && imageGeneration.imageResults.length > 0 ? (
                 <ImageResults
-                imageResults={imageGeneration.imageResults}
-                selectedImageModel={selectedImageModel}
-                imageCount={imageState.imageCount}
-                onDownloadImage={downloadImage}
-                onCopyPrompt={copyPromptToClipboard}
-              />
+                  imageResults={imageGeneration.imageResults}
+                  selectedImageModel={selectedImageModel}
+                  imageCount={imageState.imageCount}
+                  onDownloadImage={downloadImage}
+                  onCopyPrompt={copyPromptToClipboard}
+                />
               ) : mode === 'images' ? (
                 <div className="text-center py-12">
-                  <div className="text-6xl mb-4">🖼️</div>
+                  <ImageIcon className="w-16 h-16 mx-auto text-gray-400" />
                   <h3 className="text-xl font-semibold text-gray-300 mb-2">Режим генерации изображений</h3>
                   <p className="text-gray-500 mb-4">
                     Введите несколько промптов для изображений, разделенных абзацами
@@ -445,6 +583,29 @@ RULES:
                   {selectedImageModel && (
                     <p className="text-sm text-blue-400 mt-2">
                       Выбрана модель: {selectedImageModel} | Изображений на промпт: {imageState.imageCount}
+                    </p>
+                  )}
+                </div>
+              ) : mode === 'videos' && videoGeneration.videoResults.length > 0 ? (
+                <VideoResults
+                  videoResults={videoGeneration.videoResults}
+                  //parsedPrompts={videoGeneration.parsedPrompts}
+                  onDownloadVideo={downloadVideo}
+                  onCopyPrompt={copyPromptToClipboard}
+                />
+              ) : mode === 'videos' ? (
+                <div className="text-center py-12">
+                  <VideoIcon className="w-16 h-16 mx-auto text-gray-400" />
+                  <h3 className="text-xl font-semibold text-gray-300 mb-2">Режим генерации видео</h3>
+                  <p className="text-gray-500 mb-4">
+                    Введите промпт или несколько промптов для генерации видео, разделенных абзацами
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Каждый абзац будет обработан как отдельный промпт для генерации видео
+                  </p>
+                  {selectedVideoModel && (
+                    <p className="text-sm text-blue-400 mt-2">
+                      Выбрана модель: {selectedVideoModel} | Длительность: 4-8с (автоматически) | Разрешение: {videoState.resolution}
                     </p>
                   )}
                 </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Mode } from '@/types/stream';
 import { ServerHistoryItem } from '@/types/stream';
+import { TrashIcon } from './Icons';
 
 type HistoryPanelProps = {
   mode: Mode;
@@ -41,11 +42,11 @@ export default function HistoryPanel({
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-              История {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : 'Текст'}
+              История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : 'Текст'}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-200 transition-colors"
+              className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -56,24 +57,32 @@ export default function HistoryPanel({
 
           {/* Кнопка очистки истории */}
           {history.length > 0 && (
-              <div className="mb-4">
-                <button
-                  onClick={() => {
-                    if (confirm(`Очистить всю историю ${mode === 'images' ? 'изображений' : mode === 'html' ? 'HTML' : 'текста'}?`)) {
-                      onClearHistory();
-                    }
-                  }}
-                  className="w-full px-3 py-2 bg-red-900/50 hover:bg-red-900 text-red-300 rounded-lg text-sm font-medium transition-colors"
-                >
-                  🗑️ Очистить историю
-                </button>
-              </div>
-            )}
+            <div className="mb-4">
+              <button
+                onClick={() => {
+                  if (confirm(`Очистить всю историю ${mode === 'images' ? 'изображений' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'видео' : 'текста'}?`)) {
+                    onClearHistory();
+                  }
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2 bg-red-900/50 cursor-pointer hover:bg-red-900 text-red-300 rounded-lg text-sm font-medium transition-colors"
+              >
+                <TrashIcon className="w-4 h-4" />
+                Очистить историю
+              </button>
+            </div>
+          )}
 
           {/* Отображение модели для изображений */}
           {mode === 'images' && history.length > 0 && (
             <div className="mb-4 text-sm text-gray-400">
               Модель: {history[0]?.model || 'Не указана'}
+            </div>
+          )}
+
+          {/* Отображение модели для видео */}
+          {mode === 'videos' && history.length > 0 && (
+            <div className="mb-4 text-sm text-gray-400">
+              Модель: {history[0]?.model || 'Veo 3.1'}
             </div>
           )}
 
