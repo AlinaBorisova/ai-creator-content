@@ -102,8 +102,8 @@ model ApiHistory {
   id        String   @id @default(cuid())
   userId    String
   prompt    String
-  mode      String   // 'text', 'html', 'images'
-  model     String?  // Для изображений: 'Imagen 4', 'Flux', etc.
+  mode      String   // 'text', 'html', 'images', 'videos'
+  model     String?  // Для изображений: 'Imagen 4', 'Flux', etc. Для видео: 'Veo 2', 'Veo 3', etc.
   results   Json?    // Результаты в JSON формате
   createdAt DateTime @default(now())
   

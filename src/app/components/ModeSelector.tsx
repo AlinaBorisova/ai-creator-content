@@ -1,4 +1,5 @@
 import { TextIcon, ImageIcon, VideoIcon, GlobeIcon } from './Icons';
+//import { VideoModel } from '@/types/stream';
 
 interface ModeSelectorProps {
   mode: 'text' | 'html' | 'images' | 'videos';
@@ -8,11 +9,11 @@ interface ModeSelectorProps {
   isImagesDropdownOpen: boolean;
   onImagesDropdownToggle: () => void;
   imageModels: string[];
-  //videoModels: string[];
-  //selectedVideoModel: string | null;
-  //onVideoModelChange: (model: string | null) => void;
-  //isVideosDropdownOpen: boolean;
-  //onVideosDropdownToggle: () => void;
+  // selectedVideoModel: VideoModel | null;
+  // onVideoModelChange: (model: VideoModel | null) => void;
+  // isVideosDropdownOpen: boolean;
+  // onVideosDropdownToggle: () => void;
+  // videoModels: VideoModel[];
 }
 
 export function ModeSelector({
@@ -23,11 +24,11 @@ export function ModeSelector({
   isImagesDropdownOpen,
   onImagesDropdownToggle,
   imageModels,
-  //videoModels,
-  //selectedVideoModel,
-  //onVideoModelChange,
-  //isVideosDropdownOpen,
-  //onVideosDropdownToggle
+  // selectedVideoModel,
+  // onVideoModelChange,
+  // isVideosDropdownOpen,
+  // onVideosDropdownToggle,
+  // videoModels
 }: ModeSelectorProps) {
   return (
     <div className="flex gap-2 mb-4">
@@ -78,15 +79,19 @@ export function ModeSelector({
           </div>
         )}
       </div>
-      <button
-        onClick={() => onModeChange('videos')}
-        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'videos'
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
-      >
-        <VideoIcon className="w-4 h-4" /> Veo 3.1
-      </button>
+      <div className="relative">
+        <button
+          onClick={() => onModeChange('videos')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer transition-colors ${mode === 'videos'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+        >
+          <VideoIcon className="w-4 h-4" /> Видео
+        </button>
+
+
+      </div>
     </div>
   );
 }

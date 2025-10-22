@@ -82,7 +82,7 @@ export default function HistoryPanel({
           {/* Отображение модели для видео */}
           {mode === 'videos' && history.length > 0 && (
             <div className="mb-4 text-sm text-gray-400">
-              Модель: {history[0]?.model || 'Veo 3.1'}
+              Модель: {history[0]?.model || 'Не указана'}
             </div>
           )}
 

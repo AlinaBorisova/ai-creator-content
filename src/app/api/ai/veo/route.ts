@@ -11,7 +11,10 @@ export async function POST(request: NextRequest) {
     const {
       prompt,
       referenceImages = [],
-      modelVersion = 'veo-3.1-generate-preview'
+      modelVersion = 'veo-2.0-generate-001',
+      durationSeconds = '8',
+      aspectRatio = '16:9',
+      resolution = '720p'
     } = body;
 
     if (!prompt) {
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Запрос к Veo API с референсными изображениями
+    // ✅ ИСПРАВЛЕННАЯ структура запроса согласно документации
     const requestBody = {
       instances: [{
         prompt: finalPrompt,
@@ -76,9 +79,17 @@ export async function POST(request: NextRequest) {
           image: processedImages[0] // Veo поддерживает одно референсное изображение
         })
       }]
+      // ❌ УБРАНО поле "config" - оно не поддерживается API
     };
 
     console.log('📤 Sending request to Veo API:', JSON.stringify(requestBody, null, 2));
+    console.log('🔗 URL:', `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predictLongRunning`);
+    console.log('🎯 Модель:', modelVersion);
+    console.log('⏱️ Длительность:', durationSeconds, 'секунд');
+    console.log('📐 Соотношение сторон:', aspectRatio);
+    console.log('📺 Разрешение:', resolution);
+    console.log('🖼️ Референсные изображения:', processedImages.length > 0 ? `${processedImages.length} изображений` : 'Нет');
+    console.log('📝 Финальный промпт:', finalPrompt);
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predictLongRunning?key=${apiKey}`,

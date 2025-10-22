@@ -10,7 +10,7 @@ import { useCodePanels } from '@/hooks/useCodePanels';
 import { useImageState } from '@/hooks/useImageState';
 import { useImageGeneration } from '@/hooks/useImageGeneration';
 import HistoryPanel from '../components/HistoryPanel';
-import { StreamState, ImageGenerationResult, PANELS_COUNT, ServerHistoryItem } from '@/types/stream';
+import { StreamState, ImageGenerationResult, PANELS_COUNT, ServerHistoryItem, VideoGenerationResult } from '@/types/stream';
 import { ModeSelector } from '../components/ModeSelector';
 import { RequestCountSelector } from '../components/RequestCountSelector';
 import { ImageSettings } from '../components/ImageSettings';
@@ -27,6 +27,7 @@ import { useVideoGeneration } from '@/hooks/useVideoGeneration';
 import { VideoSettings } from '../components/VideoSettings';
 import { VideoResults } from '../components/VideoResults';
 import { ImageIcon, VideoIcon } from '../components/Icons';
+//import { VideoModel } from '@/types/stream';
 
 export default function AIPage() {
   const { user, loading } = useAuth();
@@ -37,9 +38,12 @@ export default function AIPage() {
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
   const [currentPromptValue, setCurrentPromptValue] = useState<string>('');
   //const [isVideosDropdownOpen, setIsVideosDropdownOpen] = useState(false);
-  const [selectedVideoModel] = useState<string | null>(null);
+  //const [selectedVideoModel] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState<number>(1);
-  //const videoModels = ['Veo 3.1', 'Veo 3.1 Fast'];
+  // const [isVideosDropdownOpen, setIsVideosDropdownOpen] = useState(false);
+  // const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel | null>('Veo 2');
+  // const videoModels: VideoModel[] = ['Veo 2', 'Veo 3', 'Veo 3 Fast', 'Veo 3.1', 'Veo 3.1 Fast'];
+
 
 
   // Кастомные хуки
@@ -197,7 +201,9 @@ export default function AIPage() {
     if (mode === 'images' && item.results && Array.isArray(item.results)) {
       // Загружаем результаты изображений
       imageGeneration.setImageResults(item.results as ImageGenerationResult[]);
-      //setParsedPrompts((item.results as ImageGenerationResult[]).map((r: ImageGenerationResult) => r.prompt));
+    } else if (mode === 'videos' && item.results && Array.isArray(item.results)) {
+      // Загружаем результаты видео
+      videoGeneration.setVideoResults(item.results as VideoGenerationResult[]);
     } else if (item.results && Array.isArray(item.results) && item.results.length > 0) {
       // Загружаем результаты text/html
       const resultsArray = item.results as StreamState[];
@@ -213,7 +219,7 @@ export default function AIPage() {
     } else {
       setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
     }
-  }, [prompt, setStreams, mode, imageGeneration]);
+  }, [prompt, setStreams, mode, imageGeneration, videoGeneration]);
 
   const deleteFromHistoryLocal = useCallback((id: string) => {
     deleteFromHistory(id);
@@ -228,7 +234,13 @@ export default function AIPage() {
       imageGeneration.setImageResults([]);
       hasSavedImagesRef.current = false;
     }
-  }, [clearHistory, mode, selectedImageModel, imageGeneration]);
+    
+    // Очищаем результаты видео и сбрасываем флаг
+    if (mode === 'videos') {
+      videoGeneration.setVideoResults([]);
+      hasSavedVideosRef.current = false;
+    }
+  }, [clearHistory, mode, selectedImageModel, imageGeneration, videoGeneration]);
 
   const saveToHistoryLocal = useCallback(async (promptText: string, results: StreamState[]) => {
     console.log('Saving to server history:', promptText, results);
@@ -272,9 +284,11 @@ export default function AIPage() {
     if (mode === 'videos') {
       videoGeneration.handleVideosMode(
         prompt.value,
-        'Veo 3.1',
+        videoState.selectedModel,
         videoState.resolution,
-        'veo-3.1-generate-preview',
+        videoState.modelVersion,
+        videoState.duration,
+        videoState.aspectRatio,
         videoState.referenceImages,
         prompt.setError
       );
@@ -336,7 +350,11 @@ RULES:
     startStream,
     videoGeneration,
     videoState.referenceImages,
-    videoState.resolution
+    videoState.resolution,
+    videoState.modelVersion,
+    videoState.selectedModel,
+    videoState.aspectRatio,
+    videoState.duration
   ]);
 
   const onImageToVideoSubmit = useCallback(() => {
@@ -354,9 +372,11 @@ RULES:
     // Вызываем логику генерации видео
     videoGeneration.handleVideosMode(
       prompt.value,
-      'Veo 3.1',
+      videoState.selectedModel,
       videoState.resolution,
-      'veo-3.1-generate-preview',
+      videoState.modelVersion,
+      videoState.duration,
+      videoState.aspectRatio,
       videoState.referenceImages,
       prompt.setError
     );
@@ -384,7 +404,6 @@ RULES:
         hasSavedImagesRef.current = false;
       }
     } else if (mode === 'videos') {
-      // Для режима видео - новая логика
       const allDone = videoGeneration.videoResults.every(result => result.status === 'done' || result.status === 'error');
       const hasContent = videoGeneration.videoResults.some(result => result.video.videoBytes);
 
@@ -396,7 +415,7 @@ RULES:
         saveToHistory(
           prompt.value, // Используем оригинальный промпт
           'videos',
-          'Veo 3.1',
+          videoState.selectedModel, // Используем выбранную модель
           videoGeneration.videoResults
         );
       } else if (!allDone) {
@@ -418,7 +437,7 @@ RULES:
         hasSavedRef.current = false;
       }
     }
-  }, [imageGeneration.imageResults, videoGeneration.videoResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef, hasSavedVideosRef]);
+  }, [imageGeneration.imageResults, videoGeneration.videoResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef, hasSavedVideosRef, videoState.selectedModel]);
 
   // useEffect для загрузки истории по режиму
   useEffect(() => {
@@ -427,19 +446,22 @@ RULES:
       if (mode === 'images' && !selectedImageModel) {
         return; // Не загружаем историю, если модель не выбрана
       }
-      // Для режима видео загружаем историю только если выбрана модель
-      const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) :
-        mode === 'videos' ? 'Veo 3.1' : undefined;
+      
+      // Для режима видео загружаем историю независимо от модели
+      const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
       loadHistory(mode, modelToLoad);
     }
-  }, [user?.id, mode, selectedImageModel, selectedVideoModel, loadHistory]);
+  }, [user?.id, mode, selectedImageModel, videoState.selectedModel, loadHistory]);
 
   useEffect(() => {
     // Сбрасываем выбранную модель изображений при переключении на text/html режимы
     if (mode !== 'images' && selectedImageModel !== null) {
       setSelectedImageModel(null);
     }
-    // Для режима видео модель не сбрасываем, так как она фиксированная
+    // Сбрасываем выбранную модель видео при переключении на другие режимы
+    // if (mode !== 'videos' && selectedVideoModel !== null) {
+    //   setSelectedVideoModel(null);
+    // }
 
     // Сбрасываем флаги сохранения при смене режима
     if (mode !== 'images') {
@@ -484,6 +506,11 @@ RULES:
               isImagesDropdownOpen={isImagesDropdownOpen}
               onImagesDropdownToggle={() => setIsImagesDropdownOpen(!isImagesDropdownOpen)}
               imageModels={imageModels}
+            // selectedVideoModel={selectedVideoModel}
+            // onVideoModelChange={setSelectedVideoModel}
+            // isVideosDropdownOpen={isVideosDropdownOpen}
+            // onVideosDropdownToggle={() => setIsVideosDropdownOpen(!isVideosDropdownOpen)}
+            // videoModels={videoModels}
             />
 
             <RequestCountSelector
@@ -510,14 +537,14 @@ RULES:
                 generationMode={videoState.generationMode}
                 resolution={videoState.resolution}
                 aspectRatio={videoState.aspectRatio}
-                //referenceImages={videoState.referenceImages}
+                selectedModel={videoState.selectedModel}
+                duration={videoState.duration}
                 startingImage={videoState.startingImage}
                 onModeChange={videoState.setGenerationMode}
                 onResolutionChange={videoState.setResolution}
                 onAspectRatioChange={videoState.setAspectRatio}
-                onAddReferenceImage={videoState.addReferenceImage}
-                onRemoveReferenceImage={videoState.removeReferenceImage}
-                onClearReferenceImages={videoState.clearReferenceImages}
+                onModelChange={videoState.setSelectedModel}
+                onDurationChange={videoState.setDuration}
                 onSetStartingImage={videoState.setStartingImageFile}
                 onClearStartingImage={videoState.clearStartingImage}
               />
@@ -603,9 +630,9 @@ RULES:
                   <p className="text-sm text-gray-600">
                     Каждый абзац будет обработан как отдельный промпт для генерации видео
                   </p>
-                  {selectedVideoModel && (
+                  {videoState.selectedModel && (
                     <p className="text-sm text-blue-400 mt-2">
-                      Выбрана модель: {selectedVideoModel} | Длительность: 4-8с (автоматически) | Разрешение: {videoState.resolution}
+                      Выбрана модель: {videoState.selectedModel} | Длительность: 4-8с (автоматически) | Разрешение: {videoState.resolution}
                     </p>
                   )}
                 </div>

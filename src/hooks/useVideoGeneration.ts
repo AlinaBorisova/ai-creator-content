@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { VideoGenerationResult, GeneratedVideo, ReferenceImage } from '@/types/stream';
+import { VideoModel } from '@/types/stream';
 
 export function useVideoGeneration() {
   const [videoResults, setVideoResults] = useState<VideoGenerationResult[]>([]);
@@ -11,6 +12,8 @@ export function useVideoGeneration() {
     promptText: string,
     modelVersion: string,
     resolution: string,
+    durationSeconds: string,
+    aspectRatio: string,
     referenceImages: ReferenceImage[] = []
   ): Promise<{ video: GeneratedVideo, translation?: { translated: string; hasSlavicPrompts: boolean; wasTranslated: boolean } }> => {
     try {
@@ -39,6 +42,9 @@ export function useVideoGeneration() {
         body: JSON.stringify({
           prompt: promptText,
           modelVersion,
+          durationSeconds,
+          aspectRatio,
+          resolution,
           referenceImages: imagesForApi
         })
       });
@@ -136,10 +142,11 @@ export function useVideoGeneration() {
 
   const handleVideosMode = useCallback(async (
     promptValue: string,
-    selectedVideoModel: string | null,
-    //duration: number,
+    selectedVideoModel: VideoModel | null,
     resolution: string,
     modelVersion: string,
+    durationSeconds: string,
+    aspectRatio: string,
     referenceImages: ReferenceImage[],
     onError: (error: string) => void
   ) => {
@@ -165,13 +172,14 @@ export function useVideoGeneration() {
         videoBytes: '',
         mimeType: 'video/mp4',
         duration: 0,
-        resolution: '720p',
-        aspectRatio: '16:9'
+        resolution: resolution,
+        aspectRatio: aspectRatio
       },
       status: 'loading',
       translatedPrompt: undefined,
       hasSlavicPrompts: false,
-      wasTranslated: false
+      wasTranslated: false,
+      model: selectedVideoModel || 'Veo 2'
     }));
     setVideoResults(initialResults);
 
@@ -188,7 +196,14 @@ export function useVideoGeneration() {
           console.log(`🎬 Generating video for prompt ${i + 1}:`, promptText);
 
           try {
-            const result = await generateVideo(promptText, modelVersion, resolution, referenceImages);
+            const result = await generateVideo(
+              promptText, 
+              modelVersion, 
+              resolution, 
+              durationSeconds,
+              aspectRatio,
+              referenceImages
+            );
 
             results.push({
               prompt: promptText,
@@ -207,7 +222,7 @@ export function useVideoGeneration() {
                 mimeType: 'video/mp4',
                 duration: 0,
                 resolution: resolution,
-                aspectRatio: '16:9'
+                aspectRatio: aspectRatio
               },
               status: 'error',
               translatedPrompt: undefined,
@@ -237,7 +252,13 @@ export function useVideoGeneration() {
           console.log(`🎬 Generating video for prompt ${i + 1}:`, promptText);
 
           try {
-            const result = await generateVideo(promptText, modelVersion, resolution);
+            const result = await generateVideo(
+              promptText, 
+              modelVersion, 
+              resolution, 
+              durationSeconds,
+              aspectRatio
+            );
 
             results.push({
               prompt: promptText,
@@ -256,7 +277,7 @@ export function useVideoGeneration() {
                 mimeType: 'video/mp4',
                 duration: 0,
                 resolution: resolution,
-                aspectRatio: '16:9'
+                aspectRatio: aspectRatio
               },
               status: 'error',
               translatedPrompt: undefined,

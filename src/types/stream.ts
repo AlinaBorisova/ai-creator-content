@@ -32,6 +32,7 @@ export interface VideoGenerationResult {
   hasSlavicPrompts?: boolean;
   wasTranslated?: boolean;
   referenceImages?: ReferenceImage[];
+  model?: VideoModel;
 }
 
 export interface GeneratedVideo {
@@ -42,6 +43,10 @@ export interface GeneratedVideo {
   aspectRatio: string;
   index?: number;
 }
+
+export type VideoModel = 'Veo 2' | 'Veo 3' | 'Veo 3 Fast' | 'Veo 3.1' | 'Veo 3.1 Fast';
+
+export type VideoDuration = '4' | '5' | '6' | '8';
 
 export type VideoGenerationMode = 'text-to-video' | 'image-to-video';
 
