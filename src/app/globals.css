@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+:root {
+  --background-color: #191919;
+  /* --btn-color: #364153; */
+  --btn-color: #191919;
+  --btn-active-color: #1d6fba;
+  --btn-hover-border: #1d6fba;
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.5s ease-in-out;

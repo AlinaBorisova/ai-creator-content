@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { StreamState, PANELS_COUNT, Mode } from '@/types/stream';
+import { StreamState, PANELS_COUNT, Mode, GroundingMetadata, GroundingChunk } from '@/types/stream';
 
 export const useStreams = () => {
   const [textStreams, setTextStreams] = useState<StreamState[]>(
@@ -11,6 +11,9 @@ export const useStreams = () => {
   const [imageStreams, setImageStreams] = useState<StreamState[]>(
     () => Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' }))
   );
+  const [researchStreams, setResearchStreams] = useState<StreamState[]>(
+    () => Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' }))
+  );
 
   const deltaQueue = useRef<Map<number, string>>(new Map());
   const deltaTimeout = useRef<Map<number, NodeJS.Timeout>>(new Map());
@@ -20,15 +23,17 @@ export const useStreams = () => {
       case 'html': return htmlStreams;
       case 'text': return textStreams;
       case 'images': return imageStreams;
+      case 'research': return researchStreams;
       default: return textStreams;
     }
   };
-  
+
   const setStreams = (mode: Mode) => {
     switch (mode) {
       case 'html': return setHtmlStreams;
       case 'text': return setTextStreams;
       case 'images': return setImageStreams;
+      case 'research': return setResearchStreams;
       default: return setTextStreams;
     }
   };
@@ -100,10 +105,34 @@ export const useStreams = () => {
     deltaTimeout.current.set(index, timeout);
   }, []);
 
+  // Новая функция для обновления grounding метаданных
+  const updateGroundingMetadata = useCallback((index: number, mode: Mode, metadata: GroundingMetadata) => {
+
+    const setStreamsFn = setStreams(mode);
+    setStreamsFn(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+
+      // Извлекаем источники из grounding метаданных
+      const sources = metadata?.groundingChunks?.map((chunk: GroundingChunk) => ({
+        title: chunk.web?.title || 'Unknown',
+        uri: chunk.web?.uri || ''
+      })) || [];
+
+      next[index] = {
+        ...next[index],
+        groundingMetadata: metadata,
+        sources,
+        searchQueries: metadata?.webSearchQueries || []
+      };
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     const deltaTimeoutRef = deltaTimeout.current;
     const deltaQueueRef = deltaQueue.current;
-    
+
     return () => {
       // Очищаем все таймауты при размонтировании
       deltaTimeoutRef.forEach(timeout => clearTimeout(timeout));
@@ -116,9 +145,11 @@ export const useStreams = () => {
     textStreams,
     htmlStreams,
     imageStreams,
+    researchStreams,
     getStreams,
     setStreams,
     markDone,
-    appendDelta
+    appendDelta,
+    updateGroundingMetadata
   };
 };

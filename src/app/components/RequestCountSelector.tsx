@@ -1,5 +1,5 @@
 interface RequestCountSelectorProps {
-  mode: 'text' | 'html' | 'images' | 'videos';
+  mode: 'text' | 'html' | 'images' | 'videos' | 'research';
   requestCount: number;
   imageCount: number;
   onRequestCountChange: (count: number) => void;
@@ -22,9 +22,9 @@ export function RequestCountSelector({
             <button
               key={count}
               onClick={() => onImageCountChange(count)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imageCount === count
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              className={`px-3 py-2 rounded-lg w-[50px] text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageCount === count
+                  ? 'bg-(--btn-active-color) text-white'
+                  : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                 }`}
             >
               {count}
@@ -38,9 +38,9 @@ export function RequestCountSelector({
               <button
                 key={count}
                 onClick={() => onImageCountChange(count)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imageCount === count
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                className={`px-3 py-2 rounded-lg w-[50px] text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageCount === count
+                    ? 'bg-(--btn-active-color) text-white'
+                    : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                   }`}
               >
                 {count}
@@ -54,9 +54,9 @@ export function RequestCountSelector({
             <button
               key={count}
               onClick={() => onRequestCountChange(count)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${requestCount === count
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              className={`px-3 py-2 rounded-lg w-[50px] text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${requestCount === count
+                  ? 'bg-(--btn-active-color) text-white'
+                  : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                 }`}
             >
               {count}

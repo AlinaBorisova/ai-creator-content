@@ -6,7 +6,18 @@ module.exports = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        background: {
+          DEFAULT: 'var(--background-color)',
+        },
+        btn: {
+          color: 'var(--btn-color)',
+          activeColor: 'var(--btn-active-color)',
+          hoverBorder: 'var(--btn-hover-border)',
+        },
+      },
+    },
   },
   plugins: [],
 }

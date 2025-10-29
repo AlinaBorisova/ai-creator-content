@@ -30,9 +30,9 @@ export function ImageSettings({
           <button
             key={ratio.value}
             onClick={() => onAspectRatioChange(ratio.value)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${aspectRatio === ratio.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${aspectRatio === ratio.value
+                ? 'bg-(--btn-active-color) text-white'
+                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
               }`}
             title={ratio.label}
           >
@@ -52,9 +52,9 @@ export function ImageSettings({
           <button
             key={model.value}
             onClick={() => onImagenModelChange(model.value)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imagenModel === model.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imagenModel === model.value
+                ? 'bg-(--btn-active-color) text-white'
+                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
               }`}
             title={model.label}
           >
@@ -75,9 +75,9 @@ export function ImageSettings({
             <button
               key={size.value}
               onClick={() => onImageSizeChange(size.value)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${imageSize === size.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageSize === size.value
+                  ? 'bg-(--btn-active-color) text-white'
+                  : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                 }`}
               title={size.label}
             >

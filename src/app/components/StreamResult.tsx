@@ -33,7 +33,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
   onAdjustIframeHeight
 }) => {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-800/50 p-4 flex flex-col">
+    <div className="rounded-xl border border-gray-700 bg-(--background-color) p-4 flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-gray-200">Result #{index + 1}</h3>
         <span className={
@@ -43,7 +43,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
               ? 'text-xs px-2 py-1 rounded bg-green-900/30 text-green-300'
               : stream.status === 'error'
                 ? 'text-xs px-2 py-1 rounded bg-red-900/30 text-red-300'
-                : 'text-xs px-2 py-1 rounded bg-gray-700 text-gray-300'
+                : 'text-xs px-2 py-1 rounded bg-(--background-color) text-gray-300'
         }>
           {stream.status}
         </span>
@@ -56,7 +56,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
             {/* Кнопка для показа/скрытия кода слева */}
             <button
               onClick={() => onToggleCodePanel(index)}
-              className={`flex-shrink-0 w-12 h-12 mr-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${isCodePanelOpen ? 'bg-blue-600 hover:bg-blue-700 hidden' : ''
+              className={`flex-shrink-0 w-12 h-12 mr-2 rounded-lg bg-(--background-color) border border-gray-700 hover:border-(--btn-hover-border) border border-gray-700 text-gray-300 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 ${isCodePanelOpen ? 'bg-blue-600 hover:bg-blue-700 hidden' : ''
                 }`}
               title={isCodePanelOpen ? 'Скрыть код' : 'Показать код'}
             >
@@ -69,7 +69,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
             {/* Контейнер для preview и кода */}
             <div className="flex-1 flex">
               {/* Блок с кодом */}
-              <div className={`bg-gray-900 border-r border-gray-700 transition-all duration-300 ease-in-out overflow-y-auto code-column ${isCodePanelOpen
+              <div className={`bg-(--background-color) border-r border-gray-700 transition-all duration-300 ease-in-out overflow-y-auto code-column ${isCodePanelOpen
                 ? 'w-1/2 opacity-100 translate-x-0'
                 : 'w-0 opacity-0 -translate-x-full overflow-hidden'
                 }`}>
@@ -99,14 +99,14 @@ export const StreamResult: React.FC<StreamResultProps> = ({
                       height: isCodePanelOpen ? `${Math.max(iframeHeight - 60, 300)}px` : '0px'
                     }}
                   >
-                    <div className="bg-gray-800 rounded p-3 border border-gray-700 h-full">
+                    <div className="bg-(--background-color) rounded p-3 border border-gray-700 h-full">
                       {stream.status === 'error' ? (
                         <p className="text-red-300 text-sm">{stream.error ?? 'Ошибка'}</p>
                       ) : isEditing ? (
                         <textarea
                           value={stream.text}
                           onChange={(e) => onUpdateText(index, e.target.value)}
-                          className="w-full h-full min-h-[300px] bg-gray-700 text-gray-300 text-sm font-mono p-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+                          className="w-full h-full min-h-[300px] bg-(--background-color) text-gray-300 text-sm font-mono p-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
                           spellCheck={false}
                         />
                       ) : (
@@ -175,7 +175,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
             <textarea
               value={stream.text}
               onChange={(e) => onUpdateText(index, e.target.value)}
-              className="w-full h-full min-h-[200px] bg-gray-800 text-gray-100 text-sm p-3 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full h-full min-h-[200px] bg-(--background-color) text-gray-100 text-sm p-3 rounded border border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
               spellCheck={false}
             />
           ) : (
@@ -191,9 +191,9 @@ export const StreamResult: React.FC<StreamResultProps> = ({
           type="button"
           onClick={() => onToggleEdit(index)}
           className={`${isEditing
-            ? 'bg-blue-600 hover:bg-blue-700'
-            : 'bg-gray-700 hover:bg-gray-600'
-            } text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60`}
+            ? 'bg-(--btn-active-color)'
+            : 'bg-(--btn-color) hover:border-(--btn-hover-border)'
+            } text-white text-sm py-2 px-3 border border-gray-700 rounded-md transition-all duration-300 hover:scale-105 cursor-pointer disabled:opacity-60`}
           disabled={!stream.text || stream.status === 'loading'}
           title={isEditing ? 'Завершить редактирование' : 'Редактировать текст'}
         >
@@ -212,7 +212,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
         <button
           type="button"
           onClick={() => onCopyToClipboard(index)}
-          className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
+          className="flex items-center gap-1 bg-(--btn-color) border border-gray-700 hover:border-(--btn-hover-border) text-white text-sm py-2 px-3 rounded-md transition-all duration-300 hover:scale-105 cursor-pointer disabled:opacity-60"
           disabled={!stream.text}
           title="Copy to clipboard"
         >
@@ -221,7 +221,7 @@ export const StreamResult: React.FC<StreamResultProps> = ({
         <button
           type="button"
           onClick={() => onAbort(index)}
-          className="flex items-center gap-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-3 rounded-md transition-colors cursor-pointer disabled:opacity-60"
+          className="flex items-center gap-1 bg-(--btn-color) border border-gray-700 hover:border-(--btn-hover-border) text-white text-sm py-2 px-3 rounded-md transition-all duration-300 hover:scale-105 cursor-pointer disabled:opacity-60"
           disabled={stream.status !== 'loading'}
           title="Отменить этот поток"
         >

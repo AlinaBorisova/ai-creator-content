@@ -7,7 +7,7 @@ export function HistoryButton({ isOpen, onToggle }: HistoryButtonProps) {
   return (
     <button
       onClick={onToggle}
-      className={`relative w-[50px] h-[50px] top-0 left-0 bg-gray-800 hover:bg-gray-700 text-gray-300 p-3 rounded-lg shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isOpen ? 'hidden' : 'block'
+      className={`relative w-[50px] h-[50px] top-0 left-0 bg-(--btn-color) hover:border-(--btn-hover-border) border border-gray-700 text-gray-300 p-3 rounded-lg shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isOpen ? 'hidden' : 'block'
         }`}
       title="История запросов"
     >

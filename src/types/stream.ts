@@ -50,10 +50,40 @@ export type VideoDuration = '4' | '5' | '6' | '8';
 
 export type VideoGenerationMode = 'text-to-video' | 'image-to-video';
 
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
+// Тип для grounding chunk из API ответа
+export interface GroundingChunk {
+  web?: {
+    title: string;
+    uri: string;
+  };
+}
+
+export interface GroundingMetadata {
+  webSearchQueries: string[];
+  groundingChunks: GroundingChunk[];
+  groundingSupports: {
+    segment: {
+      startIndex: number;
+      endIndex: number;
+      text: string;
+    };
+    groundingChunkIndices: number[];
+  }[];
+}
+
 export type StreamState = {
   text: string;
   status: StreamStatus;
   error?: string | null;
+  // Новые поля для grounding
+  groundingMetadata?: GroundingMetadata;
+  sources?: GroundingSource[];
+  searchQueries?: string[];
 };
 
 export type HistoryItem = {
@@ -95,6 +125,6 @@ export interface ApiToken {
   expiresAt?: string;
 }
 
-export type Mode = 'text' | 'html' | 'images' | 'videos';
+export type Mode = 'text' | 'html' | 'images' | 'videos' | 'research';
 
 export const PANELS_COUNT = 1;

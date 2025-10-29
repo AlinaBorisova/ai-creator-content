@@ -1,7 +1,4 @@
-// Константы для взаимодействия с API gen-api.ru
-// const API_KEY = process.env.GEN_API_KEY;
-// const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/imagen-4';
-// const CHECK_STATUS_URL_BASE = 'https://api.gen-api.ru/api/v1/request/get/';
+// Константы для взаимодействия с API google-api.ru
 
 const FLUX_API_KEY = process.env.GEN_API_KEY;
 const START_GENERATION_URL = 'https://api.gen-api.ru/api/v1/networks/flux';

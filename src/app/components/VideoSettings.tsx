@@ -1,6 +1,5 @@
 import { VideoModeSelector } from './VideoModeSelector';
 import { StartingImageUpload } from './StartingImageUpload';
-//import { ReferenceImageUpload } from './ReferenceImageUpload';
 import { ReferenceImage, VideoGenerationMode, VideoModel, VideoDuration } from '@/types/stream';
 import { InfoIcon } from './Icons';
 import {
@@ -66,9 +65,9 @@ export function VideoSettings({
               <button
                 key={model}
                 onClick={() => onModelChange(model)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${selectedModel === model
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${selectedModel === model
+                  ? 'bg-(--btn-active-color) text-white'
+                  : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                   }`}
                 title={model}
               >
@@ -79,7 +78,7 @@ export function VideoSettings({
         </div>
 
         {/* Описание выбранной модели */}
-        <div className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+        <div className="p-3 bg-(--background-color) border border-gray-700 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <div className={`w-3 h-3 rounded-full ${supportsAudio ? 'bg-green-500' : 'bg-red-500'}`}></div>
             <span className="text-sm font-medium text-gray-200">
@@ -87,7 +86,7 @@ export function VideoSettings({
             </span>
           </div>
           <p className="text-xs text-gray-400">
-            {modelLimitations.length > 0 
+            {modelLimitations.length > 0
               ? `Ограничения: ${modelLimitations.join(', ')}`
               : 'Все опции доступны'
             }
@@ -103,21 +102,20 @@ export function VideoSettings({
             const isDisabled = shouldForce8Seconds && dur !== '8';
             const isIncompatible = !isResolutionDurationCompatible(selectedModel, resolution, dur);
             const isActuallyDisabled = isDisabled || isIncompatible;
-            
+
             return (
               <button
                 key={dur}
                 onClick={() => !isActuallyDisabled && onDurationChange(dur as VideoDuration)}
                 disabled={isActuallyDisabled}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActuallyDisabled 
-                    ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
-                    : duration === dur
-                      ? 'bg-blue-600 text-white cursor-pointer'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${isActuallyDisabled
+                  ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
+                  : duration === dur
+                    ? 'bg-(--btn-active-color) text-white'
+                    : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+                  }`}
                 title={
-                  isDisabled 
+                  isDisabled
                     ? 'Только 8 секунд при использовании референсных изображений'
                     : isIncompatible
                       ? 'Несовместимо с текущим разрешением'
@@ -144,21 +142,20 @@ export function VideoSettings({
             const isIncompatibleWithAspectRatio = !isResolutionAspectRatioCompatible(selectedModel, res, aspectRatio);
             const isIncompatibleWithDuration = !isResolutionDurationCompatible(selectedModel, res, duration);
             const isDisabled = isIncompatibleWithAspectRatio || isIncompatibleWithDuration;
-            
+
             return (
               <button
                 key={res}
                 onClick={() => !isDisabled && onResolutionChange(res)}
                 disabled={isDisabled}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDisabled 
-                    ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
-                    : resolution === res
-                      ? 'bg-blue-600 text-white cursor-pointer'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${isDisabled
+                  ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
+                  : resolution === res
+                    ? 'bg-(--btn-active-color) text-white'
+                    : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+                  }`}
                 title={
-                  isDisabled 
+                  isDisabled
                     ? 'Несовместимо с текущими настройками'
                     : res
                 }
@@ -181,21 +178,20 @@ export function VideoSettings({
           <span className="text-sm text-gray-400 self-center mr-2">Соотношение:</span>
           {availableAspectRatios.map((ratio) => {
             const isDisabled = !isResolutionAspectRatioCompatible(selectedModel, resolution, ratio);
-            
+
             return (
               <button
                 key={ratio}
                 onClick={() => !isDisabled && onAspectRatioChange(ratio)}
                 disabled={isDisabled}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isDisabled 
-                    ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
-                    : aspectRatio === ratio
-                      ? 'bg-blue-600 text-white cursor-pointer'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600 cursor-pointer'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${isDisabled
+                  ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
+                  : aspectRatio === ratio
+                    ? 'bg-(--btn-active-color) text-white'
+                    : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+                  }`}
                 title={
-                  isDisabled 
+                  isDisabled
                     ? 'Несовместимо с текущим разрешением'
                     : ratio
                 }
@@ -216,12 +212,12 @@ export function VideoSettings({
       <VideoModeSelector mode={generationMode} onModeChange={onModeChange} />
 
       {/* Информационная панель с текущими настройками */}
-      <div className="mb-4 p-4 bg-blue-900/20 border border-blue-700/30 rounded-lg">
+      <div className="mb-4 p-4 bg-(--background-color) border border-gray-700 rounded-lg">
         <div className="flex items-start gap-2">
-          <InfoIcon className="text-blue-400 text-sm w-4 h-4 mt-0.5" />
-          <div className="text-sm text-blue-200">
+          <InfoIcon className="text-gray-300 text-sm w-4 h-4 mt-0.5" />
+          <div className="text-sm text-text-gray-300">
             <p className="font-medium mb-2">Текущие настройки:</p>
-            <div className="grid grid-cols-2 gap-2 text-xs text-blue-300">
+            <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
               <div>
                 <span className="font-medium">Модель:</span> {selectedModel}
               </div>

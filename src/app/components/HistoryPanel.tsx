@@ -37,13 +37,12 @@ export default function HistoryPanel({
   return (
     <>
       {/* Выдвижная панель истории */}
-      <div className={`fixed top-0 left-0 h-full w-80 bg-gray-900 border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      <div className={`fixed top-0 left-0 h-full w-80 bg-(--background-color) border-r border-gray-700 transform transition-transform duration-300 ease-in-out z-40 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-              История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : 'Текст'}
-            </h2>
+            История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : 'Текст'}            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
@@ -60,7 +59,13 @@ export default function HistoryPanel({
             <div className="mb-4">
               <button
                 onClick={() => {
-                  if (confirm(`Очистить всю историю ${mode === 'images' ? 'изображений' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'видео' : 'текста'}?`)) {
+                  if (confirm(`Очистить всю историю ${
+                    mode === 'images' ? 'изображений' 
+                    : mode === 'html' ? 'HTML' 
+                    : mode === 'videos' ? 'видео'
+                    : mode === 'research' ? 'research'
+                    : 'текста'
+                  }?`)) {
                     onClearHistory();
                   }
                 }}

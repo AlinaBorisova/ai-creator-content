@@ -3,15 +3,12 @@ import { ErrorIcon, VideoIcon, SpinnerIcon } from './Icons';
 
 interface VideoResultsProps {
   videoResults: VideoGenerationResult[];
-  //parsedPrompts: string[];
   onDownloadVideo: (video: GeneratedVideo, filename: string) => void;
   onCopyPrompt: (text: string) => void;
 }
 
 export function VideoResults({
   videoResults,
-  //parsedPrompts,
-  //selectedVideoModel,
   onDownloadVideo,
   onCopyPrompt
 }: VideoResultsProps) {
@@ -20,7 +17,7 @@ export function VideoResults({
       {videoResults.map((result: VideoGenerationResult, index: number) => (
         <div key={index} className="flex gap-4">
           {/* Блок с промптом - 30% ширины */}
-          <div className="w-[30%] bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="w-[30%] bg-(--background-color) border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-300">Промпт #{index + 1}</h4>
               <button
@@ -56,11 +53,6 @@ export function VideoResults({
                   result.status === 'done' ? 'Готово' :
                     result.status === 'error' ? 'Ошибка' : 'Ожидание'}
               </span>
-              {/* {selectedVideoModel && (
-                <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
-                  {selectedVideoModel}
-                </span>
-              )} */}
               {result.hasSlavicPrompts && (
                 <span className="text-xs px-2 py-1 rounded bg-blue-900/30 text-blue-300" title="Применены подсказки славянской внешности">
                   🇷🇺 Slavic

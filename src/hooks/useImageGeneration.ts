@@ -65,11 +65,6 @@ export function useImageGeneration() {
       return;
     }
 
-    // if (prompts.length > 1) { // PANELS_COUNT
-    //   onError('Максимум 1 промптов за раз');
-    //   return;
-    // }
-
     setIsParsingPrompts(true);
     setParsedPrompts(prompts);
 

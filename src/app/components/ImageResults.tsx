@@ -22,7 +22,7 @@ export function ImageResults({
       {imageResults.map((result: ImageGenerationResult, index: number) => (
         <div key={index} className="flex gap-4">
           {/* Блок с промптом - 30% ширины */}
-          <div className="w-[30%] bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="w-[30%] bg-(--background-color) border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-300">Промпт #{index + 1}</h4>
               <button
@@ -76,7 +76,7 @@ export function ImageResults({
             {result.status === 'loading' ? (
               <>
                 {Array.from({ length: imageCount }, (_, imgIndex) => (
-                  <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                  <div key={imgIndex} className="flex-1 bg-(--background-color) border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                     <div className="text-center text-gray-500">
                       <div className="animate-spin text-4xl mb-2">
                         <SpinnerIcon className="w-12 h-12 mx-auto text-blue-400" />
@@ -101,7 +101,7 @@ export function ImageResults({
             ) : selectedImageModel === 'Imagen 4' ? (
               <>
                 {result.images.slice(0, imageCount).map((image, imgIndex) => (
-                  <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-2 flex flex-col min-h-[200px]">
+                  <div key={imgIndex} className="flex-1 bg-(--background-color) border border-gray-700 rounded-lg p-2 flex flex-col min-h-[200px]">
                     {/* Кнопка скачивания */}
                     <div className="flex justify-end mb-2">
                       <button
@@ -136,7 +136,7 @@ export function ImageResults({
                 {result.images.length === 0 && (
                   <>
                     {Array.from({ length: imageCount }, (_, imgIndex) => (
-                      <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                      <div key={imgIndex} className="flex-1 bg-(--background-color) border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                         <div className="text-center text-gray-500">
                           <ImageIcon className="w-12 h-12 mx-auto text-blue-400" />
                           <p className="text-sm">Нет изображений</p>
@@ -149,7 +149,7 @@ export function ImageResults({
             ) : (
               <>
                 {Array.from({ length: imageCount }, (_, imgIndex) => (
-                  <div key={imgIndex} className="flex-1 bg-gray-800/50 border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
+                  <div key={imgIndex} className="flex-1 bg-(--background-color) border border-gray-700 rounded-lg p-6 flex items-center justify-center min-h-[200px]">
                     <div className="text-center text-gray-500">
                       <ImageIcon className="w-12 h-12 mx-auto text-blue-400" />
                       <p className="text-sm">Изображение #{index + 1}-{imgIndex + 1}</p>

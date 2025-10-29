@@ -10,7 +10,7 @@ interface PromptFormProps {
     error?: string;
     touched: boolean;
   };
-  mode: 'text' | 'html' | 'images' | 'videos';
+  mode: 'text' | 'html' | 'images' | 'videos' | 'research';
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isStreaming: boolean;
   isParsingPrompts: boolean;
@@ -42,9 +42,11 @@ export function PromptForm({
                 ? 'Введите промпт или несколько промптов для изображений, разделенных абзацами...'
                 : mode === 'videos'
                 ? 'Введите промпт или несколько промптов для видео, разделенных абзацами...'
+                : mode === 'research'
+                ? 'Введите вопрос для исследования с помощью Google Search...'
                 : 'Введите ваш промпт...'
           }
-          className="w-full border border-gray-700 rounded-lg px-4 py-4 min-h-[250px] sm:min-h-[120px] bg-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 custom-scrollbar"
+          className="w-full border border-gray-700 rounded-lg px-4 py-4 min-h-[250px] sm:min-h-[120px] bg-(--background-color) focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 custom-scrollbar"
           value={prompt.value}
           onChange={prompt.onChange}
           onBlur={prompt.onBlur}
@@ -63,7 +65,7 @@ export function PromptForm({
       <div className="flex flex-col gap-2 sm:gap-3 sm:w-auto">
         <button
           type="submit"
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors cursor-pointer w-full sm:w-auto"
+          className="bg-(--btn-active-color) disabled:bg-(--btn-color) disabled:cursor-not-allowed border border-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 hover:scale-105 disabled:scale-100 cursor-pointer w-full sm:w-auto"
           disabled={!prompt.canSubmit || isStreaming || isParsingPrompts || isGeneratingImages}
         >
           {isParsingPrompts
@@ -78,6 +80,8 @@ export function PromptForm({
                     ? `Генерация ${selectedImageModel || 'Изображения'}`
                   : mode === 'videos'
                     ? `Генерация ${selectedImageModel || 'Видео'}`
+                    : mode === 'research'
+                    ? 'Исследование...'
                     : `Генерация ${requestCount} Текст${requestCount > 1 ? 's' : ''}`
           }
         </button>

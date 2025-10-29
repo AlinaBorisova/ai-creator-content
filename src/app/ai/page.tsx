@@ -27,24 +27,17 @@ import { useVideoGeneration } from '@/hooks/useVideoGeneration';
 import { VideoSettings } from '../components/VideoSettings';
 import { VideoResults } from '../components/VideoResults';
 import { ImageIcon, VideoIcon } from '../components/Icons';
-//import { VideoModel } from '@/types/stream';
+import { ResearchResults } from '../components/ResearchResults';
 
 export default function AIPage() {
   const { user, loading } = useAuth();
   const prompt = usePromptInput({ minLen: 5, maxLen: 50000 });
-  const [mode, setMode] = useState<'text' | 'html' | 'images' | 'videos'>('html');
+  const [mode, setMode] = useState<'text' | 'html' | 'images' | 'videos' | 'research'>('html');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
   const [currentPromptValue, setCurrentPromptValue] = useState<string>('');
-  //const [isVideosDropdownOpen, setIsVideosDropdownOpen] = useState(false);
-  //const [selectedVideoModel] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState<number>(1);
-  // const [isVideosDropdownOpen, setIsVideosDropdownOpen] = useState(false);
-  // const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModel | null>('Veo 2');
-  // const videoModels: VideoModel[] = ['Veo 2', 'Veo 3', 'Veo 3 Fast', 'Veo 3.1', 'Veo 3.1 Fast'];
-
-
 
   // Кастомные хуки
   const imageState = useImageState();
@@ -56,7 +49,7 @@ export default function AIPage() {
   const { history: serverHistory, loadHistory, saveToHistory, deleteFromHistory, clearHistory } = useServerHistory(user?.id || '');
 
   // Хуки для управления streams
-  const { getStreams, setStreams, markDone, appendDelta } = useStreams();
+  const { getStreams, setStreams, markDone, appendDelta, updateGroundingMetadata } = useStreams();
   const streams = getStreams(mode);
 
   // Список нейросетей для генерации изображений
@@ -87,16 +80,24 @@ export default function AIPage() {
     [streams]
   );
 
-  // Обработчики (сохраняем критическую логику)
+  // Обработчики
   const abortOne = useCallback((index: number) => {
     const ctrl = controllersRef.current[index];
-    if (ctrl) {
-      ctrl.abort();
+    if (ctrl && !ctrl.signal.aborted) {
+      try {
+        ctrl.abort();
+      } catch (error) {
+        // Игнорируем ошибки при отмене - контроллер мог уже быть отменен
+        console.log('Controller abort handled', error);
+      }
+      controllersRef.current[index] = null;
+    } else if (ctrl) {
+      // Контроллер уже был отменен, просто очищаем ссылку
       controllersRef.current[index] = null;
     }
     setStreams(mode)(prev => {
       const next = [...prev];
-      if (next[index].status === 'loading') {
+      if (next[index]?.status === 'loading') {
         next[index] = { ...next[index], status: 'idle' };
       }
       return next;
@@ -129,70 +130,6 @@ export default function AIPage() {
     });
   }, [setStreams, mode]);
 
-  const startStream = useCallback(async (index: number, p: string, ctrl: AbortController) => {
-    console.log(`🚀 Starting stream ${index} with prompt:`, p.slice(0, 50));
-    try {
-      const res = await fetch('/api/ai/gemini/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: p,
-          requestIndex: index
-        }),
-        signal: ctrl.signal,
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        throw new Error('No reader available');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.trim()) {
-              try {
-                const parsed = JSON.parse(line);
-                if (parsed.delta) {
-                  appendDelta(index, parsed.delta, mode);
-                } else if (parsed.done) {
-                  markDone(index, mode);
-                  return;
-                }
-              } catch {
-                console.warn('Failed to parse data:', line);
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
-    } catch (err) {
-      console.error(`Stream ${index} error:`, err);
-      setStreams(mode)(prev => {
-        const next = [...prev];
-        next[index] = { ...next[index], status: 'error', error: err instanceof Error ? err.message : 'Unknown error' };
-        return next;
-      });
-    }
-  }, [appendDelta, markDone, setStreams, mode]);
-
-  // Добавляем недостающие функции
   const loadFromHistory = useCallback((item: ServerHistoryItem) => {
     console.log('Loading from history:', item);
 
@@ -253,6 +190,108 @@ export default function AIPage() {
     );
   }, [saveToHistory, mode, selectedImageModel]);
 
+  const handleResearchMode = useCallback(async (promptText: string) => {
+    console.log('🔍 Starting research mode for prompt:', promptText);
+    console.log('🧪 DEBUG_MODE enabled:', process.env.DEBUG_RESEARCH === 'true');
+
+    
+    const setStreamsFn = setStreams('research');
+    setStreamsFn(prev => {
+      const next = [...prev];
+      next[0] = { text: '', status: 'loading' };
+      return next;
+    });
+
+    const controller = new AbortController();
+    controllersRef.current[0] = controller;
+
+    try {
+      const response = await fetch('/api/ai/gemini/research', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: promptText }),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const data = JSON.parse(line);
+              
+              if (data.delta) {
+                console.log('📝 Received delta:', data.delta.slice(0, 50) + '...');
+                appendDelta(0, data.delta, 'research');
+              } else if (data.groundingMetadata) {
+                console.log('🔍 Received grounding metadata:', JSON.stringify(data.groundingMetadata, null, 2));
+                updateGroundingMetadata(0, 'research', data.groundingMetadata);
+              } else if (data.done) {
+                console.log('✅ Research completed');
+                markDone(0, 'research');
+                controllersRef.current[0] = null;
+              } else if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (parseError) {
+              console.error('Error parsing stream data:', parseError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Если запрос был отменен пользователем - не обрабатываем как ошибку
+      if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted' || error.message.includes('aborted'))) {
+        console.log('Research stream aborted by user');
+        controllersRef.current[0] = null;
+        // Обновляем статус на idle вместо error
+        setStreamsFn(prev => {
+          const next = [...prev];
+          if (next[0]?.status === 'loading') {
+            next[0] = { ...next[0], status: 'idle' };
+          }
+          return next;
+        });
+        return;
+      }
+      
+      // Обрабатываем только реальные ошибки
+      console.error('Research generation error:', error);
+      setStreamsFn(prev => {
+        const next = [...prev];
+        if (next[0]) {
+          next[0] = { 
+            ...next[0], 
+            status: 'error', 
+            error: error instanceof Error ? error.message : 'Unknown error' 
+          };
+        }
+        return next;
+      });
+      controllersRef.current[0] = null;
+    }
+  }, [setStreams, appendDelta, markDone, updateGroundingMetadata]);
+
   const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -295,7 +334,12 @@ export default function AIPage() {
       return;
     }
 
-    // Логика для text/html режимов
+    if (mode === 'research') {
+      handleResearchMode(prompt.value);
+      return;
+    }
+
+    // Логика для text/html режимов (существующая)
     const finalPrompt = mode === 'html'
       ? `${prompt.value}
 
@@ -327,35 +371,107 @@ RULES:
 - Use BEM methodology for class names`
       : prompt.value;
 
-    setStreams(mode)(Array.from({ length: requestCount }, () => ({ text: '', status: 'loading' })));
-    controllersRef.current = Array.from({ length: requestCount }, () => new AbortController());
+    setStreams(mode)(prev => {
+      const next = [...prev];
+      next[0] = { text: '', status: 'loading' };
+      return next;
+    });
 
-    for (let i = 0; i < requestCount; i++) {
-      const ctrl = controllersRef.current[i]!;
-      startStream(i, finalPrompt, ctrl);
-    }
+    const controller = new AbortController();
+    controllersRef.current[0] = controller;
 
-    prompt.reset();
-  }, [
-    imageGeneration,
-    imageState.aspectRatio,
-    imageState.imageCount,
-    imageState.imageSize,
-    imageState.imagenModel,
-    mode,
-    prompt,
-    requestCount,
-    selectedImageModel,
-    setStreams,
-    startStream,
-    videoGeneration,
-    videoState.referenceImages,
-    videoState.resolution,
-    videoState.modelVersion,
-    videoState.selectedModel,
-    videoState.aspectRatio,
-    videoState.duration
-  ]);
+    fetch('/api/ai/gemini/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt: finalPrompt }),
+      signal: controller.signal
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.body?.getReader();
+      })
+      .then(reader => {
+        if (!reader) {
+          throw new Error('No reader available');
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const readStream = (): Promise<void> => {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              markDone(0, mode);
+              controllersRef.current[0] = null;
+              return;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.trim()) {
+                try {
+                  const data = JSON.parse(line);
+                  if (data.delta) {
+                    appendDelta(0, data.delta, mode);
+                  } else if (data.done) {
+                    markDone(0, mode);
+                    controllersRef.current[0] = null;
+                  } else if (data.error) {
+                    throw new Error(data.error);
+                  }
+                } catch (parseError) {
+                  console.error('Error parsing stream data:', parseError);
+                }
+              }
+            }
+
+            return readStream();
+          });
+        };
+
+        return readStream();
+      })
+      .catch(error => {
+        // Если запрос был отменен пользователем - не обрабатываем как ошибку
+        if (error.name === 'AbortError' || error.message === 'Aborted' || (error instanceof Error && error.message.includes('aborted'))) {
+          console.log('Stream aborted by user');
+          // Очищаем контроллер, если он еще не очищен
+          controllersRef.current[0] = null;
+          // Обновляем статус на idle вместо error
+          setStreams(mode)(prev => {
+            const next = [...prev];
+            if (next[0]?.status === 'loading') {
+              next[0] = { ...next[0], status: 'idle' };
+            }
+            return next;
+          });
+          return; // Выходим, не показываем ошибку
+        }
+        
+        // Обрабатываем только реальные ошибки
+        console.error('Stream generation error:', error);
+        setStreams(mode)(prev => {
+          const next = [...prev];
+          if (next[0]) {
+            next[0] = { 
+              ...next[0], 
+              status: 'error', 
+              error: error instanceof Error ? error.message : 'Unknown error' 
+            };
+          }
+          return next;
+        });
+        controllersRef.current[0] = null;
+      });
+  }, [prompt, mode, selectedImageModel, imageState, imageGeneration, videoState, videoGeneration, setStreams, appendDelta, markDone, handleResearchMode]);
+
 
   const onImageToVideoSubmit = useCallback(() => {
     if (!videoState.startingImage) {
@@ -421,16 +537,31 @@ RULES:
       } else if (!allDone) {
         hasSavedVideosRef.current = false;
       }
-    } else {
-      // Для режимов text и html - логика сохранения
+    } else if (mode === 'research') {
+      // Для режима research - логика сохранения
       const streams = getStreams(mode);
       const allDone = streams.every(s => s.status === 'done' || s.status === 'error');
       const hasContent = streams.some(s => s.text);
-
+    
+      if (allDone && hasContent && !hasSavedRef.current && currentPromptValue) {
+        hasSavedRef.current = true;
+        console.log('🔍 Saving research results to server history:', streams);
+    
+        // Сохраняем в серверную историю
+        saveToHistoryLocal(currentPromptValue, streams);
+      } else if (!allDone) {
+        hasSavedRef.current = false;
+      }
+    } else {
+      // Для режимов text и html
+      const streams = getStreams(mode);
+      const allDone = streams.every(s => s.status === 'done' || s.status === 'error');
+      const hasContent = streams.some(s => s.text);
+    
       if (allDone && hasContent && !hasSavedRef.current && currentPromptValue) {
         hasSavedRef.current = true;
         console.log('📝 Saving text/html results to server history:', streams);
-
+    
         // Сохраняем в серверную историю
         saveToHistoryLocal(currentPromptValue, streams);
       } else if (!allDone) {
@@ -458,10 +589,6 @@ RULES:
     if (mode !== 'images' && selectedImageModel !== null) {
       setSelectedImageModel(null);
     }
-    // Сбрасываем выбранную модель видео при переключении на другие режимы
-    // if (mode !== 'videos' && selectedVideoModel !== null) {
-    //   setSelectedVideoModel(null);
-    // }
 
     // Сбрасываем флаги сохранения при смене режима
     if (mode !== 'images') {
@@ -470,7 +597,7 @@ RULES:
     if (mode !== 'videos') {
       hasSavedVideosRef.current = false;
     }
-    if (mode !== 'text' && mode !== 'html') {
+    if (mode !== 'text' && mode !== 'html' && mode !== 'research') {
       hasSavedRef.current = false;
     }
   }, [mode, selectedImageModel]);
@@ -506,11 +633,6 @@ RULES:
               isImagesDropdownOpen={isImagesDropdownOpen}
               onImagesDropdownToggle={() => setIsImagesDropdownOpen(!isImagesDropdownOpen)}
               imageModels={imageModels}
-            // selectedVideoModel={selectedVideoModel}
-            // onVideoModelChange={setSelectedVideoModel}
-            // isVideosDropdownOpen={isVideosDropdownOpen}
-            // onVideosDropdownToggle={() => setIsVideosDropdownOpen(!isVideosDropdownOpen)}
-            // videoModels={videoModels}
             />
 
             <RequestCountSelector
@@ -616,7 +738,6 @@ RULES:
               ) : mode === 'videos' && videoGeneration.videoResults.length > 0 ? (
                 <VideoResults
                   videoResults={videoGeneration.videoResults}
-                  //parsedPrompts={videoGeneration.parsedPrompts}
                   onDownloadVideo={downloadVideo}
                   onCopyPrompt={copyPromptToClipboard}
                 />
@@ -636,6 +757,15 @@ RULES:
                     </p>
                   )}
                 </div>
+              ) : mode === 'research' ? (
+                <ResearchResults
+                streams={streams}
+                editingStates={editingStates}
+                onToggleEdit={toggleEdit}
+                onUpdateText={updateText}
+                onCopyToClipboard={copyToClipboard}
+                onAbort={abortOne}
+                />
               ) : (
                 <TextResults
                   streams={streams}
