@@ -46,7 +46,7 @@ export function ModeSelector({
           : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
           }`}
       >
-        <SearchIcon className="w-4 h-4" /> Research
+        <SearchIcon className="w-4 h-4" /> Исследование
       </button>
       <div className="relative">
         <button
