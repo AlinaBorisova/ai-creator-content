@@ -99,6 +99,7 @@ export function useVideoState() {
   const [duration, setDuration] = useState<VideoDuration>('8');
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [startingImage, setStartingImage] = useState<ReferenceImage | null>(null);
+  const [videoCount, setVideoCount] = useState<number>(1);
 
   // Автоматическая корректировка настроек при смене модели
   const handleModelChange = useCallback((model: VideoModel) => {
@@ -221,6 +222,8 @@ export function useVideoState() {
     clearReferenceImages,
     startingImage,
     setStartingImageFile,
-    clearStartingImage
+    clearStartingImage,
+    videoCount,
+    setVideoCount
   };
 }

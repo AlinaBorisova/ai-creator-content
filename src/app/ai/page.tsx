@@ -75,6 +75,15 @@ export default function AIPage() {
   const hasSavedImagesRef = useRef(false);
   const hasSavedVideosRef = useRef(false);
 
+  // Отслеживаем предыдущий режим для очистки промпта при смене режима
+  const prevModeRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research'>('html');
+
+  // Отслеживаем, был ли уже первый рендер
+  const isFirstRenderRef = useRef(true);
+  // Отслеживаем предыдущий режим для закрытия меню при смене режима
+  const prevModeForMenuRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research'>(mode);
+
+
   const isStreaming = useMemo(
     () => streams.some(s => s.status === 'loading'),
     [streams]
@@ -171,7 +180,7 @@ export default function AIPage() {
       imageGeneration.setImageResults([]);
       hasSavedImagesRef.current = false;
     }
-    
+
     // Очищаем результаты видео и сбрасываем флаг
     if (mode === 'videos') {
       videoGeneration.setVideoResults([]);
@@ -190,105 +199,125 @@ export default function AIPage() {
     );
   }, [saveToHistory, mode, selectedImageModel]);
 
-  const handleResearchMode = useCallback(async (promptText: string) => {
-    console.log('🔍 Starting research mode for prompt:', promptText);
-    console.log('🧪 DEBUG_MODE enabled:', process.env.DEBUG_RESEARCH === 'true');
+  const handleResearchMode = useCallback(async (promptText: string, count: number) => {
+    console.log('🔍 Starting research mode for prompt:', promptText, `with ${count} requests`);
 
-    
     const setStreamsFn = setStreams('research');
+
+    // Инициализируем потоки для всех запросов
     setStreamsFn(prev => {
       const next = [...prev];
-      next[0] = { text: '', status: 'loading' };
+      for (let i = 0; i < count; i++) {
+        next[i] = { text: '', status: 'loading' };
+      }
       return next;
     });
 
-    const controller = new AbortController();
-    controllersRef.current[0] = controller;
+    // Функция для запуска одного запроса по индексу
+    const startResearchStream = (index: number) => {
+      const controller = new AbortController();
+      controllersRef.current[index] = controller;
 
-    try {
-      const response = await fetch('/api/ai/gemini/research', {
+      fetch('/api/ai/gemini/research', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ prompt: promptText }),
         signal: controller.signal
-      });
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.body?.getReader();
+        })
+        .then(reader => {
+          if (!reader) {
+            throw new Error('No reader available');
+          }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No reader available');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const data = JSON.parse(line);
-              
-              if (data.delta) {
-                console.log('📝 Received delta:', data.delta.slice(0, 50) + '...');
-                appendDelta(0, data.delta, 'research');
-              } else if (data.groundingMetadata) {
-                console.log('🔍 Received grounding metadata:', JSON.stringify(data.groundingMetadata, null, 2));
-                updateGroundingMetadata(0, 'research', data.groundingMetadata);
-              } else if (data.done) {
-                console.log('✅ Research completed');
-                markDone(0, 'research');
-                controllersRef.current[0] = null;
-              } else if (data.error) {
-                throw new Error(data.error);
+          const readStream = (): Promise<void> => {
+            return reader.read().then(({ done, value }) => {
+              if (done) {
+                markDone(index, 'research');
+                controllersRef.current[index] = null;
+                return;
               }
-            } catch (parseError) {
-              console.error('Error parsing stream data:', parseError);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      // Если запрос был отменен пользователем - не обрабатываем как ошибку
-      if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted' || error.message.includes('aborted'))) {
-        console.log('Research stream aborted by user');
-        controllersRef.current[0] = null;
-        // Обновляем статус на idle вместо error
-        setStreamsFn(prev => {
-          const next = [...prev];
-          if (next[0]?.status === 'loading') {
-            next[0] = { ...next[0], status: 'idle' };
-          }
-          return next;
-        });
-        return;
-      }
-      
-      // Обрабатываем только реальные ошибки
-      console.error('Research generation error:', error);
-      setStreamsFn(prev => {
-        const next = [...prev];
-        if (next[0]) {
-          next[0] = { 
-            ...next[0], 
-            status: 'error', 
-            error: error instanceof Error ? error.message : 'Unknown error' 
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (line.trim()) {
+                  try {
+                    const data = JSON.parse(line);
+
+                    if (data.delta) {
+                      console.log(`📝 Received delta for research ${index}:`, data.delta.slice(0, 50) + '...');
+                      appendDelta(index, data.delta, 'research');
+                    } else if (data.groundingMetadata) {
+                      console.log(`🔍 Received grounding metadata for research ${index}:`, JSON.stringify(data.groundingMetadata, null, 2));
+                      updateGroundingMetadata(index, 'research', data.groundingMetadata);
+                    } else if (data.done) {
+                      console.log(`✅ Research ${index} completed`);
+                      markDone(index, 'research');
+                      controllersRef.current[index] = null;
+                    } else if (data.error) {
+                      throw new Error(data.error);
+                    }
+                  } catch (parseError) {
+                    console.error(`Error parsing stream data for research ${index}:`, parseError);
+                  }
+                }
+              }
+
+              return readStream();
+            });
           };
-        }
-        return next;
-      });
-      controllersRef.current[0] = null;
+
+          return readStream();
+        })
+        .catch(error => {
+          // Если запрос был отменен пользователем - не обрабатываем как ошибку
+          if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted' || error.message.includes('aborted'))) {
+            console.log(`Research stream ${index} aborted by user`);
+            controllersRef.current[index] = null;
+            // Обновляем статус на idle вместо error
+            setStreamsFn(prev => {
+              const next = [...prev];
+              if (next[index]?.status === 'loading') {
+                next[index] = { ...next[index], status: 'idle' };
+              }
+              return next;
+            });
+            return; // Выходим, не показываем ошибку
+          }
+
+          // Обрабатываем только реальные ошибки
+          console.error(`Research generation error for index ${index}:`, error);
+          setStreamsFn(prev => {
+            const next = [...prev];
+            if (next[index]) {
+              next[index] = {
+                ...next[index],
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              };
+            }
+            return next;
+          });
+          controllersRef.current[index] = null;
+        });
+    };
+
+    // Запускаем несколько параллельных запросов
+    for (let i = 0; i < count; i++) {
+      startResearchStream(i);
     }
   }, [setStreams, appendDelta, markDone, updateGroundingMetadata]);
 
@@ -329,17 +358,18 @@ export default function AIPage() {
         videoState.duration,
         videoState.aspectRatio,
         videoState.referenceImages,
+        videoState.videoCount,
         prompt.setError
       );
       return;
     }
 
     if (mode === 'research') {
-      handleResearchMode(prompt.value);
+      handleResearchMode(prompt.value, requestCount);
       return;
     }
 
-    // Логика для text/html режимов (существующая)
+    // Логика для text/html режимов с множественной генерацией
     const finalPrompt = mode === 'html'
       ? `${prompt.value}
 
@@ -371,106 +401,116 @@ RULES:
 - Use BEM methodology for class names`
       : prompt.value;
 
+    // Инициализируем потоки для всех запросов
     setStreams(mode)(prev => {
       const next = [...prev];
-      next[0] = { text: '', status: 'loading' };
+      for (let i = 0; i < requestCount; i++) {
+        next[i] = { text: '', status: 'loading' };
+      }
       return next;
     });
 
-    const controller = new AbortController();
-    controllersRef.current[0] = controller;
+    // Функция для запуска одного запроса по индексу
+    const startStream = (index: number) => {
+      const controller = new AbortController();
+      controllersRef.current[index] = controller;
 
-    fetch('/api/ai/gemini/stream', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt: finalPrompt }),
-      signal: controller.signal
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.body?.getReader();
+      fetch('/api/ai/gemini/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: finalPrompt }),
+        signal: controller.signal
       })
-      .then(reader => {
-        if (!reader) {
-          throw new Error('No reader available');
-        }
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.body?.getReader();
+        })
+        .then(reader => {
+          if (!reader) {
+            throw new Error('No reader available');
+          }
 
-        const decoder = new TextDecoder();
-        let buffer = '';
+          const decoder = new TextDecoder();
+          let buffer = '';
 
-        const readStream = (): Promise<void> => {
-          return reader.read().then(({ done, value }) => {
-            if (done) {
-              markDone(0, mode);
-              controllersRef.current[0] = null;
-              return;
-            }
+          const readStream = (): Promise<void> => {
+            return reader.read().then(({ done, value }) => {
+              if (done) {
+                markDone(index, mode);
+                controllersRef.current[index] = null;
+                return;
+              }
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
 
-            for (const line of lines) {
-              if (line.trim()) {
-                try {
-                  const data = JSON.parse(line);
-                  if (data.delta) {
-                    appendDelta(0, data.delta, mode);
-                  } else if (data.done) {
-                    markDone(0, mode);
-                    controllersRef.current[0] = null;
-                  } else if (data.error) {
-                    throw new Error(data.error);
+              for (const line of lines) {
+                if (line.trim()) {
+                  try {
+                    const data = JSON.parse(line);
+                    if (data.delta) {
+                      appendDelta(index, data.delta, mode);
+                    } else if (data.done) {
+                      markDone(index, mode);
+                      controllersRef.current[index] = null;
+                    } else if (data.error) {
+                      throw new Error(data.error);
+                    }
+                  } catch (parseError) {
+                    console.error(`Error parsing stream data for index ${index}:`, parseError);
                   }
-                } catch (parseError) {
-                  console.error('Error parsing stream data:', parseError);
                 }
               }
-            }
 
-            return readStream();
-          });
-        };
+              return readStream();
+            });
+          };
 
-        return readStream();
-      })
-      .catch(error => {
-        // Если запрос был отменен пользователем - не обрабатываем как ошибку
-        if (error.name === 'AbortError' || error.message === 'Aborted' || (error instanceof Error && error.message.includes('aborted'))) {
-          console.log('Stream aborted by user');
-          // Очищаем контроллер, если он еще не очищен
-          controllersRef.current[0] = null;
-          // Обновляем статус на idle вместо error
+          return readStream();
+        })
+        .catch(error => {
+          // Если запрос был отменен пользователем - не обрабатываем как ошибку
+          if (error.name === 'AbortError' || error.message === 'Aborted' || (error instanceof Error && error.message.includes('aborted'))) {
+            console.log(`Stream ${index} aborted by user`);
+            controllersRef.current[index] = null;
+            // Обновляем статус на idle вместо error
+            setStreams(mode)(prev => {
+              const next = [...prev];
+              if (next[index]?.status === 'loading') {
+                next[index] = { ...next[index], status: 'idle' };
+              }
+              return next;
+            });
+            return; // Выходим, не показываем ошибку
+          }
+
+          // Обрабатываем только реальные ошибки
+          console.error(`Stream ${index} generation error:`, error);
           setStreams(mode)(prev => {
             const next = [...prev];
-            if (next[0]?.status === 'loading') {
-              next[0] = { ...next[0], status: 'idle' };
+            if (next[index]) {
+              next[index] = {
+                ...next[index],
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              };
             }
             return next;
           });
-          return; // Выходим, не показываем ошибку
-        }
-        
-        // Обрабатываем только реальные ошибки
-        console.error('Stream generation error:', error);
-        setStreams(mode)(prev => {
-          const next = [...prev];
-          if (next[0]) {
-            next[0] = { 
-              ...next[0], 
-              status: 'error', 
-              error: error instanceof Error ? error.message : 'Unknown error' 
-            };
-          }
-          return next;
+          controllersRef.current[index] = null;
         });
-        controllersRef.current[0] = null;
-      });
-  }, [prompt, mode, selectedImageModel, imageState, imageGeneration, videoState, videoGeneration, setStreams, appendDelta, markDone, handleResearchMode]);
+    };
+
+    // Запускаем несколько параллельных запросов
+    for (let i = 0; i < requestCount; i++) {
+      startStream(i);
+    }
+  }, [prompt, mode, selectedImageModel, imageState, imageGeneration, videoState, videoGeneration, setStreams, appendDelta, markDone, handleResearchMode, requestCount]);
 
 
   const onImageToVideoSubmit = useCallback(() => {
@@ -494,6 +534,7 @@ RULES:
       videoState.duration,
       videoState.aspectRatio,
       videoState.referenceImages,
+      videoState.videoCount,
       prompt.setError
     );
   }, [videoState, prompt, videoGeneration]);
@@ -542,11 +583,11 @@ RULES:
       const streams = getStreams(mode);
       const allDone = streams.every(s => s.status === 'done' || s.status === 'error');
       const hasContent = streams.some(s => s.text);
-    
+
       if (allDone && hasContent && !hasSavedRef.current && currentPromptValue) {
         hasSavedRef.current = true;
         console.log('🔍 Saving research results to server history:', streams);
-    
+
         // Сохраняем в серверную историю
         saveToHistoryLocal(currentPromptValue, streams);
       } else if (!allDone) {
@@ -557,11 +598,11 @@ RULES:
       const streams = getStreams(mode);
       const allDone = streams.every(s => s.status === 'done' || s.status === 'error');
       const hasContent = streams.some(s => s.text);
-    
+
       if (allDone && hasContent && !hasSavedRef.current && currentPromptValue) {
         hasSavedRef.current = true;
         console.log('📝 Saving text/html results to server history:', streams);
-    
+
         // Сохраняем в серверную историю
         saveToHistoryLocal(currentPromptValue, streams);
       } else if (!allDone) {
@@ -577,12 +618,38 @@ RULES:
       if (mode === 'images' && !selectedImageModel) {
         return; // Не загружаем историю, если модель не выбрана
       }
-      
+
       // Для режима видео загружаем историю независимо от модели
       const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
       loadHistory(mode, modelToLoad);
     }
   }, [user?.id, mode, selectedImageModel, videoState.selectedModel, loadHistory]);
+
+  useEffect(() => {
+    // Закрываем выпадающее меню изображений при реальной смене режима (не при первом рендере)
+    if (prevModeForMenuRef.current !== mode && mode !== 'images' && isImagesDropdownOpen) {
+      setIsImagesDropdownOpen(false);
+    }
+
+    // Сбрасываем выбранную модель изображений при переключении на text/html режимы
+    if (mode !== 'images' && selectedImageModel !== null) {
+      setSelectedImageModel(null);
+    }
+
+    // Сбрасываем флаги сохранения при смене режима
+    if (mode !== 'images') {
+      hasSavedImagesRef.current = false;
+    }
+    if (mode !== 'videos') {
+      hasSavedVideosRef.current = false;
+    }
+    if (mode !== 'text' && mode !== 'html' && mode !== 'research') {
+      hasSavedRef.current = false;
+    }
+
+    // Обновляем предыдущий режим
+    prevModeForMenuRef.current = mode;
+  }, [mode, selectedImageModel, isImagesDropdownOpen]);
 
   useEffect(() => {
     // Сбрасываем выбранную модель изображений при переключении на text/html режимы
@@ -601,6 +668,25 @@ RULES:
       hasSavedRef.current = false;
     }
   }, [mode, selectedImageModel]);
+
+  // Очищаем промпт при смене режима (но не при первой загрузке)
+  useEffect(() => {
+    // Пропускаем первый рендер
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      prevModeRef.current = mode;
+      return;
+    }
+
+    // Если режим изменился, очищаем промпт
+    if (prevModeRef.current !== mode) {
+      prompt.reset();
+      prompt.setError(null);
+    }
+
+    // Обновляем предыдущий режим
+    prevModeRef.current = mode;
+  }, [mode, prompt]);
 
   if (loading) return <LoadingScreen />;
   if (!user) return <AccessDeniedScreen />;
@@ -639,8 +725,10 @@ RULES:
               mode={mode}
               requestCount={requestCount}
               imageCount={imageState.imageCount}
+              videoCount={videoState.videoCount}
               onRequestCountChange={setRequestCount}
               onImageCountChange={imageState.setImageCount}
+              onVideoCountChange={videoState.setVideoCount}
             />
 
             {mode === 'images' && (
@@ -759,12 +847,12 @@ RULES:
                 </div>
               ) : mode === 'research' ? (
                 <ResearchResults
-                streams={streams}
-                editingStates={editingStates}
-                onToggleEdit={toggleEdit}
-                onUpdateText={updateText}
-                onCopyToClipboard={copyToClipboard}
-                onAbort={abortOne}
+                  streams={streams}
+                  editingStates={editingStates}
+                  onToggleEdit={toggleEdit}
+                  onUpdateText={updateText}
+                  onCopyToClipboard={copyToClipboard}
+                  onAbort={abortOne}
                 />
               ) : (
                 <TextResults

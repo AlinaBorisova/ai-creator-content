@@ -148,6 +148,7 @@ export function useVideoGeneration() {
     durationSeconds: string,
     aspectRatio: string,
     referenceImages: ReferenceImage[],
+    videoCount: number, // НОВЫЙ ПАРАМЕТР
     onError: (error: string) => void
   ) => {
     if (!promptValue.trim()) return;
@@ -166,21 +167,27 @@ export function useVideoGeneration() {
     setParsedPrompts(prompts);
 
     // Инициализируем результаты генерации
-    const initialResults: VideoGenerationResult[] = prompts.map(promptText => ({
-      prompt: promptText,
-      video: {
-        videoBytes: '',
-        mimeType: 'video/mp4',
-        duration: 0,
-        resolution: resolution,
-        aspectRatio: aspectRatio
-      },
-      status: 'loading',
-      translatedPrompt: undefined,
-      hasSlavicPrompts: false,
-      wasTranslated: false,
-      model: selectedVideoModel || 'Veo 2'
-    }));
+    // Для каждого промпта создаем videoCount записей
+    const initialResults: VideoGenerationResult[] = [];
+    for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+      for (let videoIndex = 0; videoIndex < videoCount; videoIndex++) {
+        initialResults.push({
+          prompt: prompts[promptIndex],
+          video: {
+            videoBytes: '',
+            mimeType: 'video/mp4',
+            duration: 0,
+            resolution: resolution,
+            aspectRatio: aspectRatio
+          },
+          status: 'loading',
+          translatedPrompt: undefined,
+          hasSlavicPrompts: false,
+          wasTranslated: false,
+          model: selectedVideoModel || 'Veo 2'
+        });
+      }
+    }
     setVideoResults(initialResults);
 
     const isVeo = selectedVideoModel === 'Veo 3.1' || selectedVideoModel === 'Veo 3.1 Fast';
@@ -191,47 +198,55 @@ export function useVideoGeneration() {
       try {
         const results: VideoGenerationResult[] = [];
 
-        for (let i = 0; i < prompts.length; i++) {
-          const promptText = prompts[i];
-          console.log(`🎬 Generating video for prompt ${i + 1}:`, promptText);
+        for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+          const promptText = prompts[promptIndex];
+          console.log(`🎬 Generating ${videoCount} videos for prompt ${promptIndex + 1}:`, promptText);
 
-          try {
-            const result = await generateVideo(
-              promptText, 
-              modelVersion, 
-              resolution, 
-              durationSeconds,
-              aspectRatio,
-              referenceImages
-            );
+          // Генерируем videoCount видео для каждого промпта
+          for (let videoIndex = 0; videoIndex < videoCount; videoIndex++) {
+            try {
+              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
+              const result = await generateVideo(
+                promptText, 
+                modelVersion, 
+                resolution, 
+                durationSeconds,
+                aspectRatio,
+                referenceImages
+              );
 
-            results.push({
-              prompt: promptText,
-              video: result.video,
-              status: 'done',
-              translatedPrompt: result.translation?.translated || promptText,
-              hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
-              wasTranslated: result.translation?.wasTranslated || false
-            });
-          } catch (error) {
-            console.error(`Error generating video for prompt ${i + 1}:`, error);
-            results.push({
-              prompt: promptText,
-              video: {
-                videoBytes: '',
-                mimeType: 'video/mp4',
-                duration: 0,
-                resolution: resolution,
-                aspectRatio: aspectRatio
-              },
-              status: 'error',
-              translatedPrompt: undefined,
-              hasSlavicPrompts: false,
-              wasTranslated: false
-            });
+              results.push({
+                prompt: promptText,
+                video: result.video,
+                status: 'done',
+                translatedPrompt: result.translation?.translated || promptText,
+                hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
+                wasTranslated: result.translation?.wasTranslated || false,
+                model: selectedVideoModel || 'Veo 2'
+              });
+            } catch (error) {
+              console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+              results.push({
+                prompt: promptText,
+                video: {
+                  videoBytes: '',
+                  mimeType: 'video/mp4',
+                  duration: 0,
+                  resolution: resolution,
+                  aspectRatio: aspectRatio
+                },
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false,
+                model: selectedVideoModel || 'Veo 2'
+              });
+            }
+
+            // Обновляем результаты после каждого видео
+            setVideoResults([...results]);
           }
-
-          setVideoResults([...results]);
         }
       } catch (error) {
         console.error('Error in video generation process:', error);
@@ -240,53 +255,61 @@ export function useVideoGeneration() {
         setIsParsingPrompts(false);
       }
     } else {
-      // Убираем заглушку - всегда генерируем видео
+      // Для других моделей
       console.log('🎬 Generating video for model:', selectedVideoModel);
       setIsGeneratingVideos(true);
 
       try {
         const results: VideoGenerationResult[] = [];
 
-        for (let i = 0; i < prompts.length; i++) {
-          const promptText = prompts[i];
-          console.log(`🎬 Generating video for prompt ${i + 1}:`, promptText);
+        for (let promptIndex = 0; promptIndex < prompts.length; promptIndex++) {
+          const promptText = prompts[promptIndex];
+          console.log(`🎬 Generating ${videoCount} videos for prompt ${promptIndex + 1}:`, promptText);
 
-          try {
-            const result = await generateVideo(
-              promptText, 
-              modelVersion, 
-              resolution, 
-              durationSeconds,
-              aspectRatio
-            );
+          // Генерируем videoCount видео для каждого промпта
+          for (let videoIndex = 0; videoIndex < videoCount; videoIndex++) {
+            try {
+              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
+              const result = await generateVideo(
+                promptText, 
+                modelVersion, 
+                resolution, 
+                durationSeconds,
+                aspectRatio
+              );
 
-            results.push({
-              prompt: promptText,
-              video: result.video,
-              status: 'done',
-              translatedPrompt: result.translation?.translated || promptText,
-              hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
-              wasTranslated: result.translation?.wasTranslated || false
-            });
-          } catch (error) {
-            console.error(`Error generating video for prompt ${i + 1}:`, error);
-            results.push({
-              prompt: promptText,
-              video: {
-                videoBytes: '',
-                mimeType: 'video/mp4',
-                duration: 0,
-                resolution: resolution,
-                aspectRatio: aspectRatio
-              },
-              status: 'error',
-              translatedPrompt: undefined,
-              hasSlavicPrompts: false,
-              wasTranslated: false
-            });
+              results.push({
+                prompt: promptText,
+                video: result.video,
+                status: 'done',
+                translatedPrompt: result.translation?.translated || promptText,
+                hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
+                wasTranslated: result.translation?.wasTranslated || false,
+                model: selectedVideoModel || 'Veo 2'
+              });
+            } catch (error) {
+              console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+              results.push({
+                prompt: promptText,
+                video: {
+                  videoBytes: '',
+                  mimeType: 'video/mp4',
+                  duration: 0,
+                  resolution: resolution,
+                  aspectRatio: aspectRatio
+                },
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false,
+                model: selectedVideoModel || 'Veo 2'
+              });
+            }
+
+            // Обновляем результаты после каждого видео
+            setVideoResults([...results]);
           }
-
-          setVideoResults([...results]);
         }
       } catch (error) {
         console.error('Error in video generation process:', error);

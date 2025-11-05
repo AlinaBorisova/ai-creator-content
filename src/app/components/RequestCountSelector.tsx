@@ -2,16 +2,20 @@ interface RequestCountSelectorProps {
   mode: 'text' | 'html' | 'images' | 'videos' | 'research';
   requestCount: number;
   imageCount: number;
+  videoCount: number;
   onRequestCountChange: (count: number) => void;
   onImageCountChange: (count: number) => void;
+  onVideoCountChange: (count: number) => void;
 }
 
 export function RequestCountSelector({
   mode,
   requestCount,
   imageCount,
+  videoCount,
   onRequestCountChange,
-  onImageCountChange
+  onImageCountChange,
+  onVideoCountChange
 }: RequestCountSelectorProps) {
   return (
     <div className="flex gap-2 mb-4">
@@ -37,8 +41,8 @@ export function RequestCountSelector({
             {[1, 2, 3, 4].map((count) => (
               <button
                 key={count}
-                onClick={() => onImageCountChange(count)}
-                className={`px-3 py-2 rounded-lg w-[50px] text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageCount === count
+                onClick={() => onVideoCountChange(count)}
+                className={`px-3 py-2 rounded-lg w-[50px] text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${videoCount === count
                     ? 'bg-(--btn-active-color) text-white'
                     : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                   }`}
