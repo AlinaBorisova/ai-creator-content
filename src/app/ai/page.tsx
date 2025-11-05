@@ -772,8 +772,6 @@ RULES:
                 isStreaming={isStreaming}
                 isParsingPrompts={imageGeneration.isParsingPrompts}
                 isGeneratingImages={imageGeneration.isGeneratingImages}
-                requestCount={requestCount}
-                selectedImageModel={selectedImageModel}
               />
             )}
 

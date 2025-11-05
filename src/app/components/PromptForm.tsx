@@ -15,8 +15,6 @@ interface PromptFormProps {
   isStreaming: boolean;
   isParsingPrompts: boolean;
   isGeneratingImages: boolean;
-  requestCount: number;
-  selectedImageModel: string | null;
 }
 
 export function PromptForm({
@@ -25,9 +23,7 @@ export function PromptForm({
   onSubmit,
   isStreaming,
   isParsingPrompts,
-  isGeneratingImages,
-  requestCount,
-  selectedImageModel
+  isGeneratingImages
 }: PromptFormProps) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col items-center sm:flex-row gap-3 sm:gap-4">
@@ -74,15 +70,7 @@ export function PromptForm({
               ? 'Генерация изображений...'
               : isStreaming
                 ? 'Генерация...'
-                : mode === 'html'
-                  ? `Генерация ${requestCount} HTML${requestCount > 1 ? 's' : ''}`
-                  : mode === 'images'
-                    ? `Генерация ${selectedImageModel || 'Изображения'}`
-                  : mode === 'videos'
-                    ? `Генерация ${selectedImageModel || 'Видео'}`
-                    : mode === 'research'
-                    ? 'Исследование...'
-                    : `Генерация ${requestCount} Текст${requestCount > 1 ? 's' : ''}`
+                : 'Сгенерировать'
           }
         </button>
       </div>
