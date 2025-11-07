@@ -58,12 +58,12 @@ export const useIframeHeight = (mode: Mode, streams: StreamState[]) => {
 
   // useEffect для обработки изменения содержимого
   useEffect(() => {
-    if (mode !== 'html') return;
+    if (mode !== 'html' && mode !== 'research') return;
 
     const containers = document.querySelectorAll('.result-container');
 
     containers.forEach((container, containerIndex) => {
-      const iframe = container.querySelector('iframe[title*="HTML Preview"]');
+      const iframe = container.querySelector('iframe[title*="Preview"]');
 
       if (iframe) {
         const htmlIframe = iframe as HTMLIFrameElement;

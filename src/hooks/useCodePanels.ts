@@ -56,8 +56,8 @@ export const useCodePanels = (mode: Mode, iframeHeights: number[]) => {
       return next;
     });
 
-    // Принудительная синхронизация после изменения состояния (только в HTML режиме)
-    if (mode === 'html') {
+    // Принудительная синхронизация после изменения состояния (для HTML и Research режимов)
+    if (mode === 'html' || mode === 'research') {
       setTimeout(() => {
         syncColumnHeights();
       }, 100);
@@ -66,7 +66,7 @@ export const useCodePanels = (mode: Mode, iframeHeights: number[]) => {
 
   // useEffect для синхронизации при изменении состояния панелей
   useEffect(() => {
-    if (mode === 'html') {
+    if (mode === 'html' || mode === 'research') {
       const timer = setTimeout(() => {
         syncColumnHeights();
       }, 350);
@@ -77,7 +77,7 @@ export const useCodePanels = (mode: Mode, iframeHeights: number[]) => {
 
   // useEffect для синхронизации при изменении высот iframe
   useEffect(() => {
-    if (mode === 'html') {
+    if (mode === 'html' || mode === 'research') {
       syncColumnHeights();
     }
   }, [iframeHeights, syncColumnHeights, mode]);

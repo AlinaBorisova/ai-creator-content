@@ -202,6 +202,37 @@ export default function AIPage() {
   const handleResearchMode = useCallback(async (promptText: string, count: number) => {
     console.log('🔍 Starting research mode for prompt:', promptText, `with ${count} requests`);
 
+    // Модифицируем промпт, добавляя инструкции для вывода HTML
+    const researchPrompt = `${promptText}
+
+    STRICT FORMAT REQUIRED - Output ONLY this structure:
+
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Title</title>
+  <style>
+    /* ALL your CSS styles go here */
+  </style>
+</head>
+<body>
+  <!-- Your HTML content here -->
+</body>
+</html>
+\`\`\`
+
+RULES:
+- Output ONLY the HTML code block above
+- ALL styles must be inside the <style> tag in <head>
+- NO separate CSS blocks
+- NO explanations or text outside the code block
+- Make it visually appealing with modern design
+- Use BEM methodology for class names
+- Use information from your research to create accurate and up-to-date content`;
+
     const setStreamsFn = setStreams('research');
 
     // Инициализируем потоки для всех запросов
@@ -223,7 +254,7 @@ export default function AIPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: promptText }),
+        body: JSON.stringify({ prompt: researchPrompt }),
         signal: controller.signal
       })
         .then(response => {
@@ -847,10 +878,14 @@ RULES:
                 <ResearchResults
                   streams={streams}
                   editingStates={editingStates}
+                  openCodePanels={openCodePanels}
+                  iframeHeights={iframeHeights}
                   onToggleEdit={toggleEdit}
                   onUpdateText={updateText}
                   onCopyToClipboard={copyToClipboard}
                   onAbort={abortOne}
+                  onToggleCodePanel={toggleCodePanel}
+                  onAdjustIframeHeight={adjustIframeHeight}
                 />
               ) : (
                 <TextResults
