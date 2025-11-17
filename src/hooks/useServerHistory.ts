@@ -51,15 +51,15 @@ export const useServerHistory = (userId: string) => {
   }, [userId, loadHistory]);
 
   // Удалить из истории
-  const deleteFromHistory = useCallback(async (id: string) => {
+  const deleteFromHistory = useCallback(async (id: string, mode?: string, model?: string) => {
     try {
       const response = await fetch(`/api/history/${id}`, {
         method: 'DELETE'
       });
   
       if (response.ok) {
-        // Перезагружаем историю с сервера вместо локального обновления
-        loadHistory();
+        // Перезагружаем историю с сервера с теми же параметрами режима и модели
+        loadHistory(mode, model);
       }
     } catch (error) {
       console.error('Error deleting from history:', error);

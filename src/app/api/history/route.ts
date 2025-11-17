@@ -23,25 +23,7 @@ export async function GET(request: NextRequest) {
       take: 50
     });
 
-    // Дополнительная фильтрация на уровне API
-    const filteredHistory = history.filter(item => {
-      // Если запрашиваем text/html режим, исключаем записи, которые выглядят как изображения
-      if (mode === 'text' || mode === 'html') {
-        const imageKeywords = ['на столе', 'на фоне', 'в руках', 'фото', 'изображение', 'картинка'];
-        const isImagePrompt = imageKeywords.some(keyword => 
-          item.prompt.toLowerCase().includes(keyword.toLowerCase())
-        );
-        
-        if (isImagePrompt) {
-          console.log(`Filtering out image-like prompt from ${mode} history:`, item.prompt);
-          return false;
-        }
-      }
-      
-      return true;
-    });
-
-    return NextResponse.json(filteredHistory);
+    return NextResponse.json(history);
   } catch (error) {
     console.error('Error fetching history:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

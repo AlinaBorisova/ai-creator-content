@@ -168,8 +168,9 @@ export default function AIPage() {
   }, [prompt, setStreams, mode, imageGeneration, videoGeneration]);
 
   const deleteFromHistoryLocal = useCallback((id: string) => {
-    deleteFromHistory(id);
-  }, [deleteFromHistory]);
+    const currentModel = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
+    deleteFromHistory(id, mode, currentModel);
+  }, [deleteFromHistory, mode, selectedImageModel]);
 
   const clearHistoryLocal = useCallback(async () => {
     const modelToClear = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
@@ -191,11 +192,16 @@ export default function AIPage() {
   const saveToHistoryLocal = useCallback(async (promptText: string, results: StreamState[]) => {
     console.log('Saving to server history:', promptText, results);
 
+    // Фильтруем пустые потоки - сохраняем только те, которые имеют контент или завершены
+    const streamsToSave = results.filter(s => 
+      s.text.trim().length > 0 || s.status === 'done' || s.status === 'error'
+    );
+
     await saveToHistory(
       promptText,
       mode,
       mode === 'images' ? (selectedImageModel || undefined) : undefined,
-      results
+      streamsToSave
     );
   }, [saveToHistory, mode, selectedImageModel]);
 
@@ -603,7 +609,7 @@ RULES:
         saveToHistory(
           prompt.value, // Используем оригинальный промпт
           'videos',
-          videoState.selectedModel, // Используем выбранную модель
+          undefined, // Для videos не передаем модель - общая история для всех моделей
           videoGeneration.videoResults
         );
       } else if (!allDone) {
@@ -640,7 +646,7 @@ RULES:
         hasSavedRef.current = false;
       }
     }
-  }, [imageGeneration.imageResults, videoGeneration.videoResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef, hasSavedVideosRef, videoState.selectedModel]);
+  }, [imageGeneration.imageResults, videoGeneration.videoResults, streams, currentPromptValue, saveToHistoryLocal, mode, prompt.value, selectedImageModel, saveToHistory, getStreams, hasSavedRef, hasSavedImagesRef, hasSavedVideosRef]);
 
   // useEffect для загрузки истории по режиму
   useEffect(() => {
@@ -650,11 +656,11 @@ RULES:
         return; // Не загружаем историю, если модель не выбрана
       }
 
-      // Для режима видео загружаем историю независимо от модели
+      // Для режима видео загружаем историю независимо от модели (общая история)
       const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
       loadHistory(mode, modelToLoad);
     }
-  }, [user?.id, mode, selectedImageModel, videoState.selectedModel, loadHistory]);
+  }, [user?.id, mode, selectedImageModel, loadHistory]);
 
   useEffect(() => {
     // Закрываем выпадающее меню изображений при реальной смене режима (не при первом рендере)
