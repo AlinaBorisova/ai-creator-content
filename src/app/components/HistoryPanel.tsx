@@ -42,7 +42,7 @@ export default function HistoryPanel({
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-            История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : 'Текст'}            </h2>
+            История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : mode === 'research' ? 'Исследование' : 'Текст'}            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
