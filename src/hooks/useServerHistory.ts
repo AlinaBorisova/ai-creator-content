@@ -1,14 +1,35 @@
 // src/hooks/useServerHistory.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ServerHistoryItem } from '@/types/stream';
 
 export const useServerHistory = (userId: string) => {
   const [history, setHistory] = useState<ServerHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // Кэш истории по ключу mode_model
+  const historyCacheRef = useRef<Map<string, ServerHistoryItem[]>>(new Map());
+  // Ref для отмены предыдущих запросов
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Загрузить историю
   const loadHistory = useCallback(async (mode?: string, model?: string) => {
     if (!userId) return;
+  
+    const cacheKey = `${mode || 'all'}_${model || 'all'}`;
+    
+    // Показываем кэшированную историю сразу (оптимистичное обновление)
+    if (historyCacheRef.current.has(cacheKey)) {
+      setHistory(historyCacheRef.current.get(cacheKey)!);
+    }
+    
+    // Отменяем предыдущий запрос, если он еще выполняется
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Создаем новый контроллер для текущего запроса
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
   
     setLoading(true);
     try {
@@ -16,13 +37,31 @@ export const useServerHistory = (userId: string) => {
       if (mode) params.append('mode', mode);
       if (model) params.append('model', model);
       
-      const response = await fetch(`/api/history?${params.toString()}`);
+      const response = await fetch(`/api/history?${params.toString()}`, {
+        signal: controller.signal
+      });
+      
+      // Проверяем, не был ли запрос отменен
+      if (controller.signal.aborted) {
+        return;
+      }
+      
       const data = await response.json();
-      setHistory(data); // Заменяем историю полностью, а не добавляем
-    } catch (error) {
+      setHistory(data);
+      
+      // Обновляем кэш
+      historyCacheRef.current.set(cacheKey, data);
+    } catch (error: unknown) {
+      // Игнорируем ошибки отмены запроса
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       console.error('Error loading history:', error);
     } finally {
-      setLoading(false);
+      // Обновляем loading только если запрос не был отменен
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [userId]);
 
@@ -42,6 +81,9 @@ export const useServerHistory = (userId: string) => {
       });
   
       if (response.ok) {
+        // Инвалидируем кэш для этого режима/модели
+        const cacheKey = `${mode}_${model || 'all'}`;
+        historyCacheRef.current.delete(cacheKey);
         // Перезагружаем историю с сервера с теми же параметрами
         loadHistory(mode, model);
       }
@@ -58,6 +100,11 @@ export const useServerHistory = (userId: string) => {
       });
   
       if (response.ok) {
+        // Инвалидируем кэш для этого режима/модели
+        if (mode) {
+          const cacheKey = `${mode}_${model || 'all'}`;
+          historyCacheRef.current.delete(cacheKey);
+        }
         // Перезагружаем историю с сервера с теми же параметрами режима и модели
         loadHistory(mode, model);
       }
@@ -77,6 +124,11 @@ export const useServerHistory = (userId: string) => {
       });
   
       if (response.ok) {
+        // Инвалидируем кэш для этого режима/модели
+        if (mode) {
+          const cacheKey = `${mode}_${model || 'all'}`;
+          historyCacheRef.current.delete(cacheKey);
+        }
         // Перезагружаем историю с сервера вместо локального обновления
         loadHistory(mode, model);
       }

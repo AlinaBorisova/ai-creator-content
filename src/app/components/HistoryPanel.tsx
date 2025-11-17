@@ -8,6 +8,7 @@ import { TrashIcon } from './Icons';
 type HistoryPanelProps = {
   mode: Mode;
   history: ServerHistoryItem[];
+  loading?: boolean;
   isOpen: boolean;
   onClose: () => void;
   onLoadFromHistory: (item: ServerHistoryItem) => void;
@@ -18,6 +19,7 @@ type HistoryPanelProps = {
 export default function HistoryPanel({
   mode,
   history,
+  loading = false,
   isOpen,
   onClose,
   onLoadFromHistory,
@@ -91,11 +93,20 @@ export default function HistoryPanel({
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {history.length === 0 ? (
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+            {loading && history.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : history.length === 0 ? (
               <p className="text-sm text-gray-500 italic">История пуста</p>
             ) : (
               <div className="space-y-2">
+                {loading && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                  </div>
+                )}
                 {history.map(item => (
                   <div
                     key={item.id}

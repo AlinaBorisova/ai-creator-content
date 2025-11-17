@@ -46,7 +46,7 @@ export default function AIPage() {
   const videoGeneration = useVideoGeneration();
 
   // Получаем пользователя и серверную историю
-  const { history: serverHistory, loadHistory, saveToHistory, deleteFromHistory, clearHistory } = useServerHistory(user?.id || '');
+  const { history: serverHistory, loading: historyLoading, loadHistory, saveToHistory, deleteFromHistory, clearHistory } = useServerHistory(user?.id || '');
 
   // Хуки для управления streams
   const { getStreams, setStreams, markDone, appendDelta, updateGroundingMetadata } = useStreams();
@@ -650,7 +650,8 @@ RULES:
 
   // useEffect для загрузки истории по режиму
   useEffect(() => {
-    if (user?.id) {
+    // Загружаем историю только если панель открыта и есть пользователь
+    if (user?.id && isHistoryOpen) {
       // Для режима изображений загружаем историю только если выбрана модель
       if (mode === 'images' && !selectedImageModel) {
         return; // Не загружаем историю, если модель не выбрана
@@ -658,9 +659,15 @@ RULES:
 
       // Для режима видео загружаем историю независимо от модели (общая история)
       const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
-      loadHistory(mode, modelToLoad);
+      
+      // Добавляем небольшую задержку для debounce при быстром переключении режимов
+      const timeoutId = setTimeout(() => {
+        loadHistory(mode, modelToLoad);
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [user?.id, mode, selectedImageModel, loadHistory]);
+  }, [user?.id, mode, selectedImageModel, isHistoryOpen, loadHistory]);
 
   useEffect(() => {
     // Закрываем выпадающее меню изображений при реальной смене режима (не при первом рендере)
@@ -758,6 +765,7 @@ RULES:
           <HistoryPanel
             mode={mode}
             history={serverHistory}
+            loading={historyLoading}
             isOpen={isHistoryOpen}
             onClose={() => setIsHistoryOpen(false)}
             onLoadFromHistory={loadFromHistory}
