@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { VideoGenerationResult, GeneratedVideo, ReferenceImage } from '@/types/stream';
 import { VideoModel } from '@/types/stream';
 
@@ -8,13 +8,20 @@ export function useVideoGeneration() {
   const [parsedPrompts, setParsedPrompts] = useState<string[]>([]);
   const [isParsingPrompts, setIsParsingPrompts] = useState(false);
 
+  // ref для хранения AbortController'ов
+  const controllersRef = useRef<Array<AbortController | null>>([]);
+  // Ref для хранения флагов отмены polling'а
+  const abortFlagsRef = useRef<Array<boolean>>([]);
+
   const generateVideo = useCallback(async (
     promptText: string,
     modelVersion: string,
     resolution: string,
     durationSeconds: string,
     aspectRatio: string,
-    referenceImages: ReferenceImage[] = []
+    referenceImages: ReferenceImage[] = [],
+    signal?: AbortSignal,
+    abortFlag?: { current: boolean }
   ): Promise<{ video: GeneratedVideo, translation?: { translated: string; hasSlavicPrompts: boolean; wasTranslated: boolean } }> => {
     try {
       // Подготавливаем изображения для отправки
@@ -46,7 +53,8 @@ export function useVideoGeneration() {
           aspectRatio,
           resolution,
           referenceImages: imagesForApi
-        })
+        }),
+        signal
       });
 
       if (!response.ok) {
@@ -61,14 +69,25 @@ export function useVideoGeneration() {
       const maxAttempts = 60; // 10 минут максимум
 
       while (attempts < maxAttempts) {
+        // Проверяем флаг отмены перед каждой итерацией
+        if (signal?.aborted || (abortFlag && abortFlag.current)) {
+          throw new Error('Aborted');
+        }
+
         await new Promise(resolve => setTimeout(resolve, 10000)); // 10 секунд
+
+        // Проверяем флаг отмены после ожидания
+        if (signal?.aborted || (abortFlag && abortFlag.current)) {
+          throw new Error('Aborted');
+        }
 
         const statusResponse = await fetch('/api/ai/veo/status', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ operation: operationId })
+          body: JSON.stringify({ operation: operationId }),
+          signal
         });
 
         if (!statusResponse.ok) {
@@ -96,7 +115,8 @@ export function useVideoGeneration() {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ videoUri })
+            body: JSON.stringify({ videoUri }),
+            signal
           });
 
           if (!downloadResponse.ok) {
@@ -109,7 +129,14 @@ export function useVideoGeneration() {
           const videoBlob = new Blob([Buffer.from(downloadData.videoBytes, 'base64')], { type: 'video/mp4' });
           const videoUrl = URL.createObjectURL(videoBlob);
 
-          return new Promise((resolve) => {
+          return new Promise((resolve, reject) => {
+            // Проверяем отмену перед созданием video элемента
+            if (signal?.aborted || (abortFlag && abortFlag.current)) {
+              URL.revokeObjectURL(videoUrl);
+              reject(new Error('Aborted'));
+              return;
+            }
+
             const video = document.createElement('video');
             video.onloadedmetadata = () => {
               const realDuration = Math.round(video.duration);
@@ -125,6 +152,10 @@ export function useVideoGeneration() {
                 translation: data.translation
               });
             };
+            video.onerror = () => {
+              URL.revokeObjectURL(videoUrl);
+              reject(new Error('Failed to load video metadata'));
+            };
             video.src = videoUrl;
           });
         }
@@ -135,6 +166,9 @@ export function useVideoGeneration() {
       throw new Error('Video generation timeout');
 
     } catch (error) {
+      if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted')) {
+        throw error; // Пробрасываем AbortError дальше
+      }
       console.error('Error generating video:', error);
       throw error;
     }
@@ -148,7 +182,7 @@ export function useVideoGeneration() {
     durationSeconds: string,
     aspectRatio: string,
     referenceImages: ReferenceImage[],
-    videoCount: number, // НОВЫЙ ПАРАМЕТР
+    videoCount: number,
     onError: (error: string) => void
   ) => {
     if (!promptValue.trim()) return;
@@ -190,6 +224,11 @@ export function useVideoGeneration() {
     }
     setVideoResults(initialResults);
 
+    // Инициализируем контроллеры и флаги отмены для каждого видео
+    const totalVideos = prompts.length * videoCount;
+    controllersRef.current = Array.from({ length: totalVideos }, () => new AbortController());
+    abortFlagsRef.current = Array.from({ length: totalVideos }, () => false);
+
     const isVeo = selectedVideoModel === 'Veo 3.1' || selectedVideoModel === 'Veo 3.1 Fast';
 
     if (isVeo) {
@@ -204,28 +243,12 @@ export function useVideoGeneration() {
 
           // Генерируем videoCount видео для каждого промпта
           for (let videoIndex = 0; videoIndex < videoCount; videoIndex++) {
-            try {
-              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
-              const result = await generateVideo(
-                promptText, 
-                modelVersion, 
-                resolution, 
-                durationSeconds,
-                aspectRatio,
-                referenceImages
-              );
-
-              results.push({
-                prompt: promptText,
-                video: result.video,
-                status: 'done',
-                translatedPrompt: result.translation?.translated || promptText,
-                hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
-                wasTranslated: result.translation?.wasTranslated || false,
-                model: selectedVideoModel || 'Veo 2'
-              });
-            } catch (error) {
-              console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+            const resultIndex = promptIndex * videoCount + videoIndex;
+            const controller = controllersRef.current[resultIndex];
+            const abortFlag = { current: abortFlagsRef.current[resultIndex] };
+            
+            // Проверяем, не был ли запрос отменен
+            if (!controller || controller.signal.aborted || abortFlag.current) {
               results.push({
                 prompt: promptText,
                 video: {
@@ -235,13 +258,95 @@ export function useVideoGeneration() {
                   resolution: resolution,
                   aspectRatio: aspectRatio
                 },
-                status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                status: 'idle',
                 translatedPrompt: undefined,
                 hasSlavicPrompts: false,
                 wasTranslated: false,
                 model: selectedVideoModel || 'Veo 2'
               });
+              setVideoResults([...results]);
+              continue;
+            }
+            
+            try {
+              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
+              const result = await generateVideo(
+                promptText, 
+                modelVersion, 
+                resolution, 
+                durationSeconds,
+                aspectRatio,
+                referenceImages,
+                controller.signal,
+                abortFlag
+              );
+
+               // Проверяем, не был ли запрос отменен во время выполнения
+               if (controller.signal.aborted || abortFlag.current) {
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'idle',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              } else {
+                results.push({
+                  prompt: promptText,
+                  video: result.video,
+                  status: 'done',
+                  translatedPrompt: result.translation?.translated || promptText,
+                  hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
+                  wasTranslated: result.translation?.wasTranslated || false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              }
+            } catch (error) {
+              // Если запрос был отменен - не обрабатываем как ошибку
+              if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted' || error.message.includes('aborted'))) {
+                console.log(`Video generation ${resultIndex} aborted by user`);
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'idle',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              } else {
+                console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'error',
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              }
             }
 
             // Обновляем результаты после каждого видео
@@ -253,6 +358,8 @@ export function useVideoGeneration() {
       } finally {
         setIsGeneratingVideos(false);
         setIsParsingPrompts(false);
+        controllersRef.current = [];
+        abortFlagsRef.current = [];
       }
     } else {
       // Для других моделей
@@ -268,27 +375,12 @@ export function useVideoGeneration() {
 
           // Генерируем videoCount видео для каждого промпта
           for (let videoIndex = 0; videoIndex < videoCount; videoIndex++) {
-            try {
-              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
-              const result = await generateVideo(
-                promptText, 
-                modelVersion, 
-                resolution, 
-                durationSeconds,
-                aspectRatio
-              );
-
-              results.push({
-                prompt: promptText,
-                video: result.video,
-                status: 'done',
-                translatedPrompt: result.translation?.translated || promptText,
-                hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
-                wasTranslated: result.translation?.wasTranslated || false,
-                model: selectedVideoModel || 'Veo 2'
-              });
-            } catch (error) {
-              console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+            const resultIndex = promptIndex * videoCount + videoIndex;
+            const controller = controllersRef.current[resultIndex];
+            const abortFlag = { current: abortFlagsRef.current[resultIndex] };
+            
+            // Проверяем, не был ли запрос отменен
+            if (!controller || controller.signal.aborted || abortFlag.current) {
               results.push({
                 prompt: promptText,
                 video: {
@@ -298,13 +390,96 @@ export function useVideoGeneration() {
                   resolution: resolution,
                   aspectRatio: aspectRatio
                 },
-                status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                status: 'idle',
                 translatedPrompt: undefined,
                 hasSlavicPrompts: false,
                 wasTranslated: false,
                 model: selectedVideoModel || 'Veo 2'
               });
+              setVideoResults([...results]);
+              continue;
+            }
+
+            try {
+              console.log(`🎬 Generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}`);
+              const result = await generateVideo(
+                promptText, 
+                modelVersion, 
+                resolution, 
+                durationSeconds,
+                aspectRatio,
+                undefined,
+                controller.signal,
+                abortFlag
+              );
+
+              // Проверяем, не был ли запрос отменен во время выполнения
+              if (controller.signal.aborted || abortFlag.current) {
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'idle',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              } else {
+                results.push({
+                  prompt: promptText,
+                  video: result.video,
+                  status: 'done',
+                  translatedPrompt: result.translation?.translated || promptText,
+                  hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
+                  wasTranslated: result.translation?.wasTranslated || false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              }
+            } catch (error) {
+              // Если запрос был отменен - не обрабатываем как ошибку
+              console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+              if (error instanceof Error && (error.name === 'AbortError' || error.message === 'Aborted' || error.message.includes('aborted'))) {
+                console.log(`Video generation ${resultIndex} aborted by user`);
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'idle',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              } else {
+                console.error(`Error generating video ${videoIndex + 1}/${videoCount} for prompt ${promptIndex + 1}:`, error);
+                results.push({
+                  prompt: promptText,
+                  video: {
+                    videoBytes: '',
+                    mimeType: 'video/mp4',
+                    duration: 0,
+                    resolution: resolution,
+                    aspectRatio: aspectRatio
+                  },
+                  status: 'error',
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                  translatedPrompt: undefined,
+                  hasSlavicPrompts: false,
+                  wasTranslated: false,
+                  model: selectedVideoModel || 'Veo 2'
+                });
+              }
             }
 
             // Обновляем результаты после каждого видео
@@ -316,9 +491,38 @@ export function useVideoGeneration() {
       } finally {
         setIsGeneratingVideos(false);
         setIsParsingPrompts(false);
+        controllersRef.current = [];
+        abortFlagsRef.current = [];
       }
     }
   }, [generateVideo]);
+
+  // Функция для отмены генерации конкретного видео
+  const abortVideoGeneration = useCallback((index: number) => {
+    const controller = controllersRef.current[index];
+    if (controller && !controller.signal.aborted) {
+      try {
+        controller.abort();
+      } catch (error) {
+        console.log('Controller abort handled', error);
+      }
+      controllersRef.current[index] = null;
+    }
+    
+    // Устанавливаем флаг отмены для polling'а
+    if (abortFlagsRef.current[index] !== undefined) {
+      abortFlagsRef.current[index] = true;
+    }
+    
+    // Обновляем статус на idle
+    setVideoResults(prev => {
+      const next = [...prev];
+      if (next[index]?.status === 'loading') {
+        next[index] = { ...next[index], status: 'idle' };
+      }
+      return next;
+    });
+  }, []);
 
   return {
     videoResults,
@@ -326,6 +530,7 @@ export function useVideoGeneration() {
     isGeneratingVideos,
     parsedPrompts,
     isParsingPrompts,
-    handleVideosMode
+    handleVideosMode,
+    abortVideoGeneration
   };
 }

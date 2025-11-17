@@ -1,16 +1,18 @@
 import { VideoGenerationResult, GeneratedVideo } from '@/types/stream';
-import { ErrorIcon, VideoIcon, SpinnerIcon } from './Icons';
+import { ErrorIcon, VideoIcon, SpinnerIcon, CancelIcon } from './Icons';
 
 interface VideoResultsProps {
   videoResults: VideoGenerationResult[];
   onDownloadVideo: (video: GeneratedVideo, filename: string) => void;
   onCopyPrompt: (text: string) => void;
+  onAbort?: (index: number) => void;
 }
 
 export function VideoResults({
   videoResults,
   onDownloadVideo,
-  onCopyPrompt
+  onCopyPrompt,
+  onAbort
 }: VideoResultsProps) {
   return (
     <div className="space-y-6">
@@ -20,15 +22,28 @@ export function VideoResults({
           <div className="w-[30%] bg-(--background-color) border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-300">Промпт #{index + 1}</h4>
-              <button
-                onClick={() => onCopyPrompt(result.prompt)}
-                className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
-                title="Копировать промпт"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onCopyPrompt(result.prompt)}
+                  className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700"
+                  title="Копировать промпт"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
+                {/* Кнопка отмены */}
+                {onAbort && (
+                  <button
+                    onClick={() => onAbort(index)}
+                    className="text-gray-400 hover:text-gray-200 transition-colors p-1 rounded hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Отменить генерацию"
+                    disabled={result.status !== 'loading'}
+                  >
+                    <CancelIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-gray-400 text-sm">{result.prompt}</p>
 

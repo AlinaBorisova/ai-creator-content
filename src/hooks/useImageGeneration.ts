@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ImageGenerationResult, GeneratedImage } from '@/types/stream';
 
 export function useImageGeneration() {
@@ -7,12 +7,16 @@ export function useImageGeneration() {
   const [parsedPrompts, setParsedPrompts] = useState<string[]>([]);
   const [isParsingPrompts, setIsParsingPrompts] = useState(false);
 
+  // ref для хранения AbortController'ов
+  const controllersRef = useRef<Array<AbortController | null>>([]);
+  
   const generateImages = useCallback(async (
     promptText: string,
     imageCount: number,
     aspectRatio: string,
     imagenModel: string,
-    imageSize: string
+    imageSize: string,
+    signal?: AbortSignal
   ): Promise<{ images: GeneratedImage[], translation?: { original: string, translated: string, language: string, wasTranslated: boolean, hasSlavicPrompts: boolean } }> => {
     try {
       const response = await fetch('/api/ai/imagen', {
@@ -26,7 +30,8 @@ export function useImageGeneration() {
           imageSize: imagenModel === 'imagen-4.0-fast-generate-001' ? '1K' : imageSize,
           aspectRatio: aspectRatio,
           modelVersion: imagenModel
-        })
+        }),
+        signal
       });
 
       if (!response.ok) {
@@ -39,6 +44,9 @@ export function useImageGeneration() {
         translation: data.translation
       };
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error; // Пробрасываем AbortError дальше
+      }
       console.error('Error generating images:', error);
       throw error;
     }
@@ -82,6 +90,9 @@ export function useImageGeneration() {
     // Проверяем, выбрана ли модель Imagen 4
     const isImagen4 = selectedImageModel === 'Imagen 4';
 
+    // Инициализируем контроллеры для каждого промпта
+    controllersRef.current = prompts.map(() => new AbortController());
+
     if (isImagen4) {
       setIsGeneratingImages(true);
 
@@ -90,30 +101,69 @@ export function useImageGeneration() {
 
         for (let i = 0; i < prompts.length; i++) {
           const promptText = prompts[i];
-          console.log(`🎨 Generating images for prompt ${i + 1}:`, promptText);
-
-          try {
-            const result = await generateImages(promptText, imageCount, aspectRatio, imagenModel, imageSize);
-
-            results.push({
-              prompt: promptText,
-              images: result.images,
-              status: 'done',
-              translatedPrompt: result.translation?.translated || promptText,
-              hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
-              wasTranslated: result.translation?.wasTranslated || false
-            });
-          } catch (error) {
-            console.error(`Error generating images for prompt ${i + 1}:`, error);
+          const controller = controllersRef.current[i];
+          // Проверяем, не был ли запрос отменен
+          if (!controller || controller.signal.aborted) {
             results.push({
               prompt: promptText,
               images: [],
-              status: 'error',
-              error: error instanceof Error ? error.message : 'Unknown error',
+              status: 'idle',
               translatedPrompt: undefined,
               hasSlavicPrompts: false,
               wasTranslated: false
             });
+            setImageResults([...results]);
+            continue;
+          }
+          
+          console.log(`🎨 Generating images for prompt ${i + 1}:`, promptText);
+
+          try {
+            const result = await generateImages(promptText, imageCount, aspectRatio, imagenModel, imageSize, controller.signal);
+
+            // Проверяем, не был ли запрос отменен во время выполнения
+            if (controller.signal.aborted) {
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'idle',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            } else {
+              results.push({
+                prompt: promptText,
+                images: result.images,
+                status: 'done',
+                translatedPrompt: result.translation?.translated || promptText,
+                hasSlavicPrompts: result.translation?.hasSlavicPrompts || false,
+                wasTranslated: result.translation?.wasTranslated || false
+              });
+            }
+          } catch (error) {
+            if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+              console.log(`Image generation ${i} aborted by user`);
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'idle',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            } else {
+              console.error(`Error generating images for prompt ${i + 1}:`, error);
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            }
           }
 
           setImageResults([...results]);
@@ -123,6 +173,7 @@ export function useImageGeneration() {
       } finally {
         setIsGeneratingImages(false);
         setIsParsingPrompts(false);
+        controllersRef.current = [];
       }
     } else {
       // Для других моделей показываем заглушки
@@ -139,9 +190,32 @@ export function useImageGeneration() {
         }));
         setImageResults(placeholderResults);
         setIsParsingPrompts(false);
+        controllersRef.current = [];
       }, 1000);
     }
   }, [generateImages]);
+
+  // Функция для отмены генерации конкретного изображения
+  const abortImageGeneration = useCallback((index: number) => {
+    const controller = controllersRef.current[index];
+    if (controller && !controller.signal.aborted) {
+      try {
+        controller.abort();
+      } catch (error) {
+        console.log('Controller abort handled', error);
+      }
+      controllersRef.current[index] = null;
+      
+      // Обновляем статус на idle
+      setImageResults(prev => {
+        const next = [...prev];
+        if (next[index]?.status === 'loading') {
+          next[index] = { ...next[index], status: 'idle' };
+        }
+        return next;
+      });
+    }
+  }, []);
 
   return {
     imageResults,
@@ -149,6 +223,7 @@ export function useImageGeneration() {
     isGeneratingImages,
     parsedPrompts,
     isParsingPrompts,
-    handleImagesMode
+    handleImagesMode,
+    abortImageGeneration
   };
 }

@@ -709,15 +709,33 @@ RULES:
       return;
     }
 
-    // Если режим изменился, очищаем промпт
+    // Если режим изменился, очищаем промпт и результаты
     if (prevModeRef.current !== mode) {
       prompt.reset();
       prompt.setError(null);
+
+      // Очищаем результаты предыдущего режима
+      const prevMode = prevModeRef.current;
+
+      // Очищаем streams для режимов text/html/research
+      if (prevMode === 'text' || prevMode === 'html' || prevMode === 'research') {
+        setStreams(prevMode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
+      }
+      
+      // Очищаем результаты изображений
+      if (prevMode === 'images') {
+        imageGeneration.setImageResults([]);
+      }
+      
+      // Очищаем результаты видео
+      if (prevMode === 'videos') {
+        videoGeneration.setVideoResults([]);
+      }
     }
 
     // Обновляем предыдущий режим
     prevModeRef.current = mode;
-  }, [mode, prompt]);
+  }, [mode, prompt, setStreams, imageGeneration, videoGeneration]);
 
   if (loading) return <LoadingScreen />;
   if (!user) return <AccessDeniedScreen />;
@@ -835,6 +853,7 @@ RULES:
                   imageCount={imageState.imageCount}
                   onDownloadImage={downloadImage}
                   onCopyPrompt={copyPromptToClipboard}
+                  onAbort={imageGeneration.abortImageGeneration}
                 />
               ) : mode === 'images' ? (
                 <div className="text-center py-12">
@@ -857,6 +876,7 @@ RULES:
                   videoResults={videoGeneration.videoResults}
                   onDownloadVideo={downloadVideo}
                   onCopyPrompt={copyPromptToClipboard}
+                  onAbort={videoGeneration.abortVideoGeneration}
                 />
               ) : mode === 'videos' ? (
                 <div className="text-center py-12">
