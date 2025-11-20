@@ -47,10 +47,12 @@ export const useServerHistory = (userId: string) => {
       }
       
       const data = await response.json();
-      setHistory(data);
+      // ОПТИМИЗАЦИЯ: обрабатываем новый формат ответа с пагинацией
+      const historyItems = Array.isArray(data) ? data : (data.history || []);
+      setHistory(historyItems);
       
       // Обновляем кэш
-      historyCacheRef.current.set(cacheKey, data);
+      historyCacheRef.current.set(cacheKey, historyItems);
     } catch (error: unknown) {
       // Игнорируем ошибки отмены запроса
       if (error instanceof Error && error.name === 'AbortError') {
@@ -122,7 +124,7 @@ export const useServerHistory = (userId: string) => {
       const response = await fetch(`/api/history/clear?${params.toString()}`, {
         method: 'DELETE'
       });
-  
+      
       if (response.ok) {
         // Инвалидируем кэш для этого режима/модели
         if (mode) {
@@ -137,10 +139,33 @@ export const useServerHistory = (userId: string) => {
     }
   }, [userId, loadHistory]);
 
+  // Загрузить один элемент истории с результатами
+  const loadHistoryItem = useCallback(async (id: string): Promise<ServerHistoryItem | null> => {
+    try {
+      const response = await fetch(`/api/history/${id}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.warn('History item not found:', id);
+        } else {
+          console.error('Failed to load history item:', response.status);
+        }
+        return null;
+      }
+      
+      const item = await response.json();
+      return item;
+    } catch (error) {
+      console.error('Error loading history item:', error);
+      return null;
+    }
+  }, []);
+
   return {
     history,
     loading,
     loadHistory,
+    loadHistoryItem,
     saveToHistory,
     deleteFromHistory,
     clearHistory

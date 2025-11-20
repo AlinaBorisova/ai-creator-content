@@ -46,7 +46,7 @@ export default function AIPage() {
   const videoGeneration = useVideoGeneration();
 
   // Получаем пользователя и серверную историю
-  const { history: serverHistory, loading: historyLoading, loadHistory, saveToHistory, deleteFromHistory, clearHistory } = useServerHistory(user?.id || '');
+  const { history: serverHistory, loading: historyLoading, loadHistory, saveToHistory, deleteFromHistory, clearHistory, loadHistoryItem } = useServerHistory(user?.id || '');
 
   // Хуки для управления streams
   const { getStreams, setStreams, markDone, appendDelta, updateGroundingMetadata } = useStreams();
@@ -139,20 +139,39 @@ export default function AIPage() {
     });
   }, [setStreams, mode]);
 
-  const loadFromHistory = useCallback((item: ServerHistoryItem) => {
+  const loadFromHistory = useCallback(async (item: ServerHistoryItem) => {
     console.log('Loading from history:', item);
 
+    // Сначала устанавливаем промпт
     prompt.setValue(item.prompt);
 
-    if (mode === 'images' && item.results && Array.isArray(item.results)) {
+    // Загружаем полный элемент истории с результатами
+    const fullItem = await loadHistoryItem(item.id);
+    
+    if (!fullItem) {
+      // Если не удалось загрузить, используем данные из списка (без results)
+      console.warn('Failed to load full history item, using cached data without results');
+      // Очищаем результаты, так как их нет
+      if (mode === 'images') {
+        imageGeneration.setImageResults([]);
+      } else if (mode === 'videos') {
+        videoGeneration.setVideoResults([]);
+      } else {
+        setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
+      }
+      return;
+    }
+
+    // Используем полный элемент с результатами
+    if (mode === 'images' && fullItem.results && Array.isArray(fullItem.results)) {
       // Загружаем результаты изображений
-      imageGeneration.setImageResults(item.results as ImageGenerationResult[]);
-    } else if (mode === 'videos' && item.results && Array.isArray(item.results)) {
+      imageGeneration.setImageResults(fullItem.results as ImageGenerationResult[]);
+    } else if (mode === 'videos' && fullItem.results && Array.isArray(fullItem.results)) {
       // Загружаем результаты видео
-      videoGeneration.setVideoResults(item.results as VideoGenerationResult[]);
-    } else if (item.results && Array.isArray(item.results) && item.results.length > 0) {
+      videoGeneration.setVideoResults(fullItem.results as VideoGenerationResult[]);
+    } else if (fullItem.results && Array.isArray(fullItem.results) && fullItem.results.length > 0) {
       // Загружаем результаты text/html
-      const resultsArray = item.results as StreamState[];
+      const resultsArray = fullItem.results as StreamState[];
       const paddedResults = Array.from({ length: Math.max(PANELS_COUNT, resultsArray.length) }, (_, i) => {
         if (i < resultsArray.length) {
           return { ...resultsArray[i] };
@@ -163,9 +182,16 @@ export default function AIPage() {
 
       setStreams(mode)(paddedResults);
     } else {
-      setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
+      // Нет результатов - очищаем
+      if (mode === 'images') {
+        imageGeneration.setImageResults([]);
+      } else if (mode === 'videos') {
+        videoGeneration.setVideoResults([]);
+      } else {
+        setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
+      }
     }
-  }, [prompt, setStreams, mode, imageGeneration, videoGeneration]);
+  }, [prompt, setStreams, mode, imageGeneration, videoGeneration, loadHistoryItem]);
 
   const deleteFromHistoryLocal = useCallback((id: string) => {
     const currentModel = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
@@ -587,13 +613,25 @@ RULES:
         hasSavedImagesRef.current = true;
         console.log('🎨 Saving image results to server history:', imageGeneration.imageResults);
 
-        // Сохраняем в серверную историю
-        saveToHistory(
-          prompt.value, // Используем оригинальный промпт
-          'images',
-          selectedImageModel || undefined,
-          imageGeneration.imageResults
-        );
+        // ИСПРАВЛЕНИЕ: сохраняем каждый промпт отдельно с его результатами
+        // Если было несколько промптов, создаем отдельную запись для каждого
+        const savePromises = imageGeneration.imageResults.map(async (result) => {
+          // Сохраняем только если есть изображения или была ошибка
+          if (result.images.length > 0 || result.status === 'error') {
+            return saveToHistory(
+              result.prompt, // Используем промпт из результата, а не общий prompt.value
+              'images',
+              selectedImageModel || undefined,
+              [result] // Сохраняем только результат для этого промпта
+            );
+          }
+          return Promise.resolve();
+        });
+
+        // Ждем сохранения всех промптов
+        Promise.all(savePromises).catch(error => {
+          console.error('Error saving image results to history:', error);
+        });
       } else if (!allDone) {
         hasSavedImagesRef.current = false;
       }

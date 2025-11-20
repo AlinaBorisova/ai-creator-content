@@ -18,11 +18,39 @@ export const useAuth = () => {
 					const response = await fetch('/api/auth/verify', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ token })
+						body: JSON.stringify({ token }),
 					});
+
+					// Проверяем статус ответа
+					if (!response.ok) {
+						// Если ошибка квоты БД (503), не очищаем токен - это временная проблема
+						if (response.status === 503) {
+							console.warn('Database quota exceeded, but keeping token in cache');
+							// Можно попробовать использовать кэшированные данные пользователя
+							const cachedUser = localStorage.getItem('user');
+							if (cachedUser) {
+								try {
+									setUser(JSON.parse(cachedUser));
+								} catch {
+									// Игнорируем ошибку парсинга
+								}
+							}
+							setLoading(false);
+							return;
+						}
+
+						// Для других ошибок (401, 500) очищаем токен
+						localStorage.removeItem('authToken');
+						localStorage.removeItem('user');
+						setLoading(false);
+						return;
+					}
+
 					const data = await response.json();
 					if (data.valid) {
 						setUser(data.user);
+						// Обновляем кэш пользователя в localStorage
+						localStorage.setItem('user', JSON.stringify(data.user));
 					} else {
 						// Токен недействителен, очищаем localStorage
 						localStorage.removeItem('authToken');
@@ -30,8 +58,21 @@ export const useAuth = () => {
 					}
 				} catch (error) {
 					console.error('Auth check failed:', error);
-					localStorage.removeItem('authToken');
-					localStorage.removeItem('user');
+					// При сетевых ошибках не очищаем токен - это может быть временная проблема
+					// Используем кэшированные данные, если они есть
+					const cachedUser = localStorage.getItem('user');
+					if (cachedUser) {
+						try {
+							setUser(JSON.parse(cachedUser));
+						} catch {
+							// Если не удалось распарсить, очищаем все
+							localStorage.removeItem('authToken');
+							localStorage.removeItem('user');
+						}
+					} else {
+						localStorage.removeItem('authToken');
+						localStorage.removeItem('user');
+					}
 				}
 			}
 			setLoading(false);

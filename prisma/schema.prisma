@@ -95,6 +95,8 @@ model ApiToken {
   user ApiUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@index([token])
+  // Составной индекс для быстрого поиска по token + isActive
+  @@index([token, isActive])
 }
 
 // Таблица для истории AI запросов
@@ -111,4 +113,8 @@ model ApiHistory {
   
   @@index([userId])
   @@index([createdAt])
+  // Составной индекс для быстрого поиска по userId + mode + model
+  @@index([userId, mode, model])
+  // Индекс для частого запроса по userId + createdAt (сортировка по убыванию)
+  @@index([userId, createdAt(sort: Desc)])
 }
