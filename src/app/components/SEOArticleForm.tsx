@@ -1,9 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+// Типы для разрешений
+export type ImageResolution = {
+  width: number;
+  height: number;
+  label: string;
+  aspectRatio: string;
+};
+
+export const IMAGE_RESOLUTIONS: ImageResolution[] = [
+  { width: 1408, height: 768, label: 'Дзен', aspectRatio: '16:9' },
+  { width: 1280, height: 700, label: 'Телеграм', aspectRatio: '16:9' },
+  { width: 1080, height: 1080, label: 'Квадрат', aspectRatio: '1:1' },
+  { width: 1100, height: 550, label: 'Статьи 1', aspectRatio: '16:9' },
+  { width: 735, height: 460, label: 'Статьи 2', aspectRatio: '4:3' }
+];
 
 interface SEOArticleFormProps {
-  onGenerate: (prompt: string, htmlTemplate: string) => void;
+  onGenerate: (prompt: string, htmlTemplate: string, imageResolution: ImageResolution) => void;
   isStreaming: boolean;
   isParsingPrompts: boolean;
   isGeneratingImages: boolean;
@@ -19,6 +35,26 @@ export function SEOArticleForm({
   const [htmlTemplate, setHtmlTemplate] = useState('');
   const [promptError, setPromptError] = useState<string | null>(null);
   const [showTemplate, setShowTemplate] = useState(false);
+  const [imageResolution, setImageResolution] = useState<ImageResolution>(IMAGE_RESOLUTIONS[0]); // По умолчанию Дзен
+  const [isResolutionDropdownOpen, setIsResolutionDropdownOpen] = useState(false);
+  const resolutionDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Закрытие меню при клике вне его
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (resolutionDropdownRef.current && !resolutionDropdownRef.current.contains(event.target as Node)) {
+        setIsResolutionDropdownOpen(false);
+      }
+    };
+
+    if (isResolutionDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isResolutionDropdownOpen]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -29,13 +65,13 @@ export function SEOArticleForm({
     }
 
     setPromptError(null);
-    onGenerate(prompt, htmlTemplate);
+    onGenerate(prompt, htmlTemplate, imageResolution);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-       {/* Кнопка для открытия поля HTML шаблона */}
-       {!showTemplate && (
+      {/* Кнопка для открытия поля HTML шаблона */}
+      {!showTemplate && (
         <div>
           <button
             type="button"
@@ -77,6 +113,50 @@ export function SEOArticleForm({
           </p>
         </div>
       )}
+
+      {/* Выбор разрешения изображений */}
+      <div className="relative inline-block" ref={resolutionDropdownRef}>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Разрешение изображений
+        </label>
+        <div className="relative inline-block">
+          <button
+            type="button"
+            onClick={() => setIsResolutionDropdownOpen(!isResolutionDropdownOpen)}
+            disabled={isStreaming || isParsingPrompts || isGeneratingImages}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${isResolutionDropdownOpen
+                ? 'bg-(--btn-active-color) text-white'
+                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+              }`}
+          >
+            {imageResolution.label} ({imageResolution.width}×{imageResolution.height})
+          </button>
+          {isResolutionDropdownOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-(--btn-color) rounded-lg shadow-lg z-50 min-w-[200px]">
+              {IMAGE_RESOLUTIONS.map((res) => {
+                const isSelected = imageResolution.width === res.width && imageResolution.height === res.height;
+                return (
+                  <button
+                    key={`${res.width}x${res.height}-${res.label}`}
+                    type="button"
+                    onClick={() => {
+                      setImageResolution(res);
+                      setIsResolutionDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm text-gray-300 cursor-pointer border border-gray-700 hover:border-(--btn-hover-border) first:rounded-t-lg last:rounded-b-lg transition-colors ${isSelected ? 'bg-(--btn-active-color) text-white' : ''
+                      }`}
+                  >
+                    {res.label} ({res.width}×{res.height})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-400">
+          Выберите разрешение для сгенерированных изображений
+        </p>
+      </div>
 
       {/* Поле для промпта */}
       <div>

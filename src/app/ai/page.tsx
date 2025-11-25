@@ -887,7 +887,7 @@ RULES:
             {/* Показываем SEOArticleForm для режима seo-article */}
             {mode === 'seo-article' ? (
               <SEOArticleForm
-                onGenerate={(promptText, htmlTemplate) => {
+                onGenerate={(promptText, htmlTemplate, imageResolution) => {
                   const topicMatch = promptText.match(/тема:\s*\[([^\]]+)\]/i);
                   const queryMatch = promptText.match(/запросу:\s*\[([^\]]+)\]/i);
                   
@@ -895,7 +895,8 @@ RULES:
                     promptText,
                     topicMatch ? topicMatch[1] : undefined,
                     queryMatch ? queryMatch[1] : undefined,
-                    htmlTemplate
+                    htmlTemplate,
+                    imageResolution
                   );
                 }}
                 isStreaming={seoArticle.isGeneratingText || seoArticle.isGeneratingImages}

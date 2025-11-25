@@ -36,17 +36,13 @@ export const copyPromptToClipboard = async (promptText: string) => {
  * Оптимизирует изображение: изменяет размер (ограничивает высоту до maxHeight и ширину до maxWidth) и сжимает качество
  * @param imageBytes - base64 строка изображения (без префикса data:image/...;base64,)
  * @param mimeType - MIME тип изображения (например, 'image/jpeg', 'image/png')
- * @param maxHeight - максимальная высота в пикселях (по умолчанию 550)
  * @param quality - качество сжатия от 0 до 1 (по умолчанию 0.65)
- * @param maxWidth - максимальная ширина в пикселях (по умолчанию 1100)
  * @returns Promise с оптимизированным base64 изображением
  */
 export const optimizeImage = async (
   imageBytes: string,
   mimeType: string,
-  maxHeight: number = 550,
-  quality: number = 0.65,
-  maxWidth: number = 1100
+  quality: number = 0.65
 ): Promise<{ imageBytes: string; mimeType: string }> => {
   return new Promise((resolve, reject) => {
     try {
@@ -55,31 +51,14 @@ export const optimizeImage = async (
 
       img.onload = () => {
         try {
-          // Вычисляем новые размеры с сохранением пропорций
-          let newWidth = img.width;
-          let newHeight = img.height;
+          // Сохраняем оригинальные размеры - не изменяем их
+          const originalWidth = img.width;
+          const originalHeight = img.height;
 
-          // Сначала ограничиваем по высоте
-          if (newHeight > maxHeight) {
-            const ratio = maxHeight / newHeight;
-            newHeight = maxHeight;
-            newWidth = Math.round(newWidth * ratio);
-          }
-
-          // Затем ограничиваем по ширине, если нужно
-          if (newWidth > maxWidth) {
-            const ratio = maxWidth / newWidth;
-            newWidth = maxWidth;
-            newHeight = Math.round(newHeight * ratio);
-          }
-
-          // Если изображение уже меньше maxHeight и maxWidth, не изменяем размер
-          // но все равно сжимаем качество для уменьшения размера файла
-
-          // Создаем canvas
+          // Создаем canvas с оригинальными размерами
           const canvas = document.createElement('canvas');
-          canvas.width = newWidth;
-          canvas.height = newHeight;
+          canvas.width = originalWidth;
+          canvas.height = originalHeight;
 
           const ctx = canvas.getContext('2d');
           if (!ctx) {
@@ -87,13 +66,13 @@ export const optimizeImage = async (
             return;
           }
 
-          // Рисуем изображение на canvas
-          ctx.drawImage(img, 0, 0, newWidth, newHeight);
+          // Рисуем изображение на canvas с оригинальными размерами
+          ctx.drawImage(img, 0, 0, originalWidth, originalHeight);
 
           // Конвертируем в нужный формат (JPEG для лучшего сжатия, если исходное не PNG с прозрачностью)
           const outputMimeType = mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
 
-          // Получаем оптимизированное изображение
+          // Получаем оптимизированное изображение (только сжатие качества, размеры не меняются)
           const optimizedDataUrl = canvas.toDataURL(outputMimeType, quality);
 
           // Извлекаем base64 без префикса
@@ -103,9 +82,10 @@ export const optimizeImage = async (
             originalSize: imageBytes.length,
             optimizedSize: base64Data.length,
             reduction: `${Math.round((1 - base64Data.length / imageBytes.length) * 100)}%`,
-            originalDimensions: `${img.width}x${img.height}`,
-            newDimensions: `${newWidth}x${newHeight}`,
-            mimeType: outputMimeType
+            originalDimensions: `${originalWidth}x${originalHeight}`,
+            newDimensions: `${originalWidth}x${originalHeight}`,
+            mimeType: outputMimeType,
+            quality: quality
           });
 
           resolve({
