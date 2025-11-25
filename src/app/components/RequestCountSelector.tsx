@@ -1,5 +1,5 @@
 interface RequestCountSelectorProps {
-  mode: 'text' | 'html' | 'images' | 'videos' | 'research';
+  mode: 'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article';
   requestCount: number;
   imageCount: number;
   videoCount: number;

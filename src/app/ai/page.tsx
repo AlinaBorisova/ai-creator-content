@@ -1,5 +1,8 @@
 'use client';
 
+import { useSEOArticle } from '@/hooks/useSEOArticle';
+import { SEOArticleForm } from '../components/SEOArticleForm';
+import { SEOArticleResults } from '../components/SEOArticleResults';
 import { useServerHistory } from '@/hooks/useServerHistory';
 import { useAuth } from '@/hooks/useAuth';
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
@@ -32,7 +35,7 @@ import { ResearchResults } from '../components/ResearchResults';
 export default function AIPage() {
   const { user, loading } = useAuth();
   const prompt = usePromptInput({ minLen: 5, maxLen: 50000 });
-  const [mode, setMode] = useState<'text' | 'html' | 'images' | 'videos' | 'research'>('html');
+  const [mode, setMode] = useState<'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article'>('html');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
@@ -44,6 +47,7 @@ export default function AIPage() {
   const imageGeneration = useImageGeneration();
   const videoState = useVideoState();
   const videoGeneration = useVideoGeneration();
+  const seoArticle = useSEOArticle();
 
   // Получаем пользователя и серверную историю
   const { history: serverHistory, loading: historyLoading, loadHistory, saveToHistory, deleteFromHistory, clearHistory, loadHistoryItem } = useServerHistory(user?.id || '');
@@ -76,17 +80,21 @@ export default function AIPage() {
   const hasSavedVideosRef = useRef(false);
 
   // Отслеживаем предыдущий режим для очистки промпта при смене режима
-  const prevModeRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research'>('html');
+  const prevModeRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article'>('html');
 
   // Отслеживаем, был ли уже первый рендер
   const isFirstRenderRef = useRef(true);
   // Отслеживаем предыдущий режим для закрытия меню при смене режима
-  const prevModeForMenuRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research'>(mode);
-
+  const prevModeForMenuRef = useRef<'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article'>(mode);
 
   const isStreaming = useMemo(
-    () => streams.some(s => s.status === 'loading'),
-    [streams]
+    () => {
+      if (mode === 'seo-article') {
+        return seoArticle.isGeneratingText || seoArticle.isGeneratingImages;
+      }
+      return streams.some(s => s.status === 'loading');
+    },
+    [streams, mode, seoArticle.isGeneratingText, seoArticle.isGeneratingImages]
   );
 
   // Обработчики
@@ -147,7 +155,7 @@ export default function AIPage() {
 
     // Загружаем полный элемент истории с результатами
     const fullItem = await loadHistoryItem(item.id);
-    
+
     if (!fullItem) {
       // Если не удалось загрузить, используем данные из списка (без results)
       console.warn('Failed to load full history item, using cached data without results');
@@ -219,7 +227,7 @@ export default function AIPage() {
     console.log('Saving to server history:', promptText, results);
 
     // Фильтруем пустые потоки - сохраняем только те, которые имеют контент или завершены
-    const streamsToSave = results.filter(s => 
+    const streamsToSave = results.filter(s =>
       s.text.trim().length > 0 || s.status === 'done' || s.status === 'error'
     );
 
@@ -429,6 +437,12 @@ RULES:
 
     if (mode === 'research') {
       handleResearchMode(prompt.value, requestCount);
+      return;
+    }
+
+    if (mode === 'seo-article') {
+      // Для SEO статей используется специальная форма SEOArticleForm
+      // Обработка происходит в компоненте формы
       return;
     }
 
@@ -695,14 +709,18 @@ RULES:
         return; // Не загружаем историю, если модель не выбрана
       }
 
+      if (mode === 'seo-article') {
+        return; // Не загружаем историю для SEO-статей
+      }
+
       // Для режима видео загружаем историю независимо от модели (общая история)
       const modelToLoad = mode === 'images' ? (selectedImageModel ?? undefined) : undefined;
-      
+
       // Добавляем небольшую задержку для debounce при быстром переключении режимов
       const timeoutId = setTimeout(() => {
         loadHistory(mode, modelToLoad);
       }, 100);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [user?.id, mode, selectedImageModel, isHistoryOpen, loadHistory]);
@@ -725,7 +743,7 @@ RULES:
     if (mode !== 'videos') {
       hasSavedVideosRef.current = false;
     }
-    if (mode !== 'text' && mode !== 'html' && mode !== 'research') {
+    if (mode !== 'text' && mode !== 'html' && mode !== 'research' && mode !== 'seo-article') {
       hasSavedRef.current = false;
     }
 
@@ -772,12 +790,17 @@ RULES:
       if (prevMode === 'text' || prevMode === 'html' || prevMode === 'research') {
         setStreams(prevMode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
       }
-      
+
+      // Очищаем результаты SEO-статей
+      if (prevMode === 'seo-article') {
+        seoArticle.reset();
+      }
+
       // Очищаем результаты изображений
       if (prevMode === 'images') {
         imageGeneration.setImageResults([]);
       }
-      
+
       // Очищаем результаты видео
       if (prevMode === 'videos') {
         videoGeneration.setVideoResults([]);
@@ -786,7 +809,7 @@ RULES:
 
     // Обновляем предыдущий режим
     prevModeRef.current = mode;
-  }, [mode, prompt, setStreams, imageGeneration, videoGeneration]);
+  }, [mode, prompt, setStreams, imageGeneration, videoGeneration, seoArticle]);
 
   if (loading) return <LoadingScreen />;
   if (!user) return <AccessDeniedScreen />;
@@ -861,8 +884,25 @@ RULES:
               />
             )}
 
-            {/* Показываем PromptForm только для текстового режима или других режимов */}
-            {(mode !== 'videos' || videoState.generationMode === 'text-to-video') && (
+            {/* Показываем SEOArticleForm для режима seo-article */}
+            {mode === 'seo-article' ? (
+              <SEOArticleForm
+                onGenerate={(promptText, htmlTemplate) => {
+                  const topicMatch = promptText.match(/тема:\s*\[([^\]]+)\]/i);
+                  const queryMatch = promptText.match(/запросу:\s*\[([^\]]+)\]/i);
+                  
+                  seoArticle.generateArticleText(
+                    promptText,
+                    topicMatch ? topicMatch[1] : undefined,
+                    queryMatch ? queryMatch[1] : undefined,
+                    htmlTemplate
+                  );
+                }}
+                isStreaming={seoArticle.isGeneratingText || seoArticle.isGeneratingImages}
+                isParsingPrompts={false}
+                isGeneratingImages={seoArticle.isGeneratingImages}
+              />
+            ) : (mode !== 'videos' || videoState.generationMode === 'text-to-video') && (
               <PromptForm
                 prompt={{
                   ...prompt,
@@ -946,6 +986,12 @@ RULES:
                     </p>
                   )}
                 </div>
+              ) : mode === 'seo-article' ? (
+                <SEOArticleResults
+                  articleResult={seoArticle.articleResult}
+                  onRegenerateImage={seoArticle.regenerateImage}
+                  onAbortImageGeneration={seoArticle.abortImageGeneration}
+                />
               ) : mode === 'research' ? (
                 <ResearchResults
                   streams={streams}
