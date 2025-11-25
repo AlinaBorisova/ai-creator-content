@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { streamTextViaGeminiDirect } from '@/lib/gemini';
+import { streamTextViaGeminiDirect, GeminiModelVersion } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, topic, searchQuery } = await request.json();
+    const { prompt, topic, searchQuery, modelVersion = 'gemini-2.5-pro' } = await request.json();
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
+
+    // Валидация версии модели
+    const validModelVersion: GeminiModelVersion = 
+      (modelVersion === 'gemini-3-pro-preview' || modelVersion === 'gemini-2.5-pro')
+        ? modelVersion
+        : 'gemini-2.5-pro';
+
+    console.log('📌 Using model:', validModelVersion);
 
     // Формируем финальный промпт с инструкциями для SEO-статьи
     const seoPrompt = `Ты копирайтер. Напиши текст по теме: [${topic || 'указанная тема'}], используя Pyramid Principle. Начни с главной идеи или вывода, затем предоставь аргументы или причины, поддерживающие твою главную идею, и заверши деталями или примерами и правила LSI-копирайтинг (Latent Semantic Indexing) на 5000-12000 символов, уникальностью более 90% с соблюдением закона Ципфа, Чтобы он вышел в ТОП 10 Яндекс и Гугл по запросу: [${searchQuery || 'указанный запрос'}]. Избегай переспама ключевых запросов и других правил, которые понижают контент в поисковой выдаче Яндекс и Гугл.
@@ -55,7 +63,8 @@ ${prompt}
               const data = JSON.stringify({ delta: chunk });
               controller.enqueue(encoder.encode(`${data}\n`));
             },
-            abortController.signal
+            abortController.signal,
+            validModelVersion
           );
 
           const doneData = JSON.stringify({ done: true });

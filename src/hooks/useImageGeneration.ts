@@ -9,7 +9,7 @@ export function useImageGeneration() {
 
   // ref для хранения AbortController'ов
   const controllersRef = useRef<Array<AbortController | null>>([]);
-  
+
   const generateImages = useCallback(async (
     promptText: string,
     imageCount: number,
@@ -35,9 +35,58 @@ export function useImageGeneration() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate images');
+        // Пытаемся прочитать детали ошибки из ответа
+        let errorMessage = 'Failed to generate images';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          // Если есть детали, добавляем их к сообщению
+          if (errorData.details) {
+            if (typeof errorData.details === 'string') {
+              try {
+                const parsed = JSON.parse(errorData.details);
+                if (parsed.error?.message) {
+                  errorMessage = parsed.error.message;
+                }
+              } catch {
+                // Если не JSON, используем как есть
+              }
+            } else if (errorData.details.error?.message) {
+              errorMessage = errorData.details.error.message;
+            }
+          }
+        } catch {
+          // Если не удалось распарсить JSON, пытаемся прочитать как текст
+          // Клонируем response, так как тело уже было прочитано
+          try {
+            const clonedResponse = response.clone();
+            const errorText = await clonedResponse.text();
+            if (errorText) {
+              try {
+                const parsed = JSON.parse(errorText);
+                if (parsed.error?.message) {
+                  errorMessage = parsed.error.message;
+                }
+              } catch {
+                errorMessage = errorText.slice(0, 200); // Берем первые 200 символов
+              }
+            }
+          } catch {
+            // Если не удалось распарсить, используем дефолтное сообщение
+          }
+        }
+        
+        // Улучшаем сообщение для ошибок квоты
+        if (errorMessage.includes('quota') || errorMessage.includes('Quota exceeded')) {
+          errorMessage = 'Превышен дневной лимит запросов к Imagen API. Лимит: 70 запросов в день. Попробуйте завтра или используйте другую модель (Flux, Banana, Ideogram).';
+        } else if (errorMessage.includes('location is not supported')) {
+          errorMessage = 'Imagen API недоступен в вашем регионе. Используйте другую модель (Flux, Banana, Ideogram).';
+        }
+        
+        throw new Error(errorMessage);
       }
 
+      // ✅ Только если response.ok === true, читаем успешный ответ
       const data = await response.json();
       return {
         images: data.images || [],
@@ -115,7 +164,7 @@ export function useImageGeneration() {
             setImageResults([...results]);
             continue;
           }
-          
+
           console.log(`🎨 Generating images for prompt ${i + 1}:`, promptText);
 
           try {
@@ -153,12 +202,19 @@ export function useImageGeneration() {
                 wasTranslated: false
               });
             } else {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
               console.error(`Error generating images for prompt ${i + 1}:`, error);
+              
+              // Показываем ошибку пользователю через onError callback (только для первого промпта)
+              if (i === 0) {
+                onError(errorMessage);
+              }
+              
               results.push({
                 prompt: promptText,
                 images: [],
                 status: 'error',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: errorMessage,
                 translatedPrompt: undefined,
                 hasSlavicPrompts: false,
                 wasTranslated: false
@@ -205,7 +261,7 @@ export function useImageGeneration() {
         console.log('Controller abort handled', error);
       }
       controllersRef.current[index] = null;
-      
+
       // Обновляем статус на idle
       setImageResults(prev => {
         const next = [...prev];
