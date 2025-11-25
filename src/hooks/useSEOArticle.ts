@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { SEOArticleResult, ImagePlaceholder, GeneratedImage } from '@/types/stream';
 import { extractImagePrompts, updateImagePlaceholderInHTML } from '@/utils/seoArticleUtils';
 import { optimizeImage } from '@/utils/imageUtils';
+import { ImageResolution } from '@/app/components/SEOArticleForm';
 
 export function useSEOArticle() {
   const [articleResult, setArticleResult] = useState<SEOArticleResult | null>(null);
@@ -127,7 +128,8 @@ export function useSEOArticle() {
    */
   const generateAllImages = useCallback(async (
     htmlContent: string,
-    placeholders: ImagePlaceholder[]
+    placeholders: ImagePlaceholder[],
+    imageResolution?: ImageResolution
   ) => {
     setIsGeneratingImages(true);
 
@@ -143,6 +145,9 @@ export function useSEOArticle() {
       imageControllersRef.current.set(placeholder.id, controller);
 
       try {
+        // Получаем разрешение из параметра или используем дефолтное
+        const resolution = imageResolution || { width: 1408, height: 768, label: 'Дзен', aspectRatio: '16:9' };
+
         const response = await fetch('/api/ai/imagen', {
           method: 'POST',
           headers: {
@@ -152,7 +157,7 @@ export function useSEOArticle() {
             prompt: placeholder.prompt,
             numberOfImages: placeholder.imageCount,
             imageSize: '1K',
-            aspectRatio: '16:9',
+            aspectRatio: resolution.aspectRatio,
             modelVersion: 'imagen-4.0-generate-001'
           }),
           signal: controller.signal
@@ -171,7 +176,8 @@ export function useSEOArticle() {
           images = await Promise.all(
             images.map(async (img) => {
               try {
-                const optimized = await optimizeImage(img.imageBytes, img.mimeType, 550, 0.65, 1100);
+                // Используем разрешение из параметра функции (уже получено выше)
+                const optimized = await optimizeImage(img.imageBytes, img.mimeType, 0.65);
                 return {
                   ...img,
                   imageBytes: optimized.imageBytes,
@@ -267,8 +273,11 @@ export function useSEOArticle() {
     prompt: string,
     topic?: string,
     searchQuery?: string,
-    htmlTemplate?: string
+    htmlTemplate?: string,
+    imageResolution?: ImageResolution
   ) => {
+    const resolution = imageResolution || { width: 1408, height: 768, label: 'Дзен', aspectRatio: '16:9' };
+    
     setIsGeneratingText(true);
     setArticleResult({
       id: `article-${Date.now()}`,
@@ -277,7 +286,8 @@ export function useSEOArticle() {
       imagePlaceholders: [],
       status: 'generating-text',
       createdAt: Date.now(),
-      htmlTemplate: htmlTemplate || ''
+      htmlTemplate: htmlTemplate || '',
+      imageResolution: resolution
     });
 
     const controller = new AbortController();
@@ -352,7 +362,8 @@ export function useSEOArticle() {
 
                 // Автоматически запускаем генерацию изображений
                 if (placeholders.length > 0) {
-                  generateAllImages(htmlContent, placeholders);
+                  // Используем разрешение из замыкания
+                  generateAllImages(htmlContent, placeholders, resolution);
                 }
               } else if (data.error) {
                 throw new Error(data.error);
@@ -416,15 +427,15 @@ export function useSEOArticle() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          prompt: placeholder.prompt,
-          numberOfImages: placeholder.imageCount,
-          imageSize: '1K',
-          aspectRatio: '16:9',
-          modelVersion: 'imagen-4.0-generate-001'
-        }),
-        signal: controller.signal
-      });
+          body: JSON.stringify({
+            prompt: placeholder.prompt,
+            numberOfImages: placeholder.imageCount,
+            imageSize: '1K',
+            aspectRatio: article?.imageResolution?.aspectRatio || '16:9',
+            modelVersion: 'imagen-4.0-generate-001'
+          }),
+          signal: controller.signal
+        });
 
       if (!response.ok) {
         throw new Error(`Failed to regenerate image: ${response.status}`);
@@ -439,8 +450,7 @@ export function useSEOArticle() {
         images = await Promise.all(
           images.map(async (img) => {
             try {
-              const optimized = await optimizeImage(img.imageBytes, img.mimeType, 550, 0.65, 1100);
-              return {
+              const optimized = await optimizeImage(img.imageBytes, img.mimeType, 0.65);              return {
                 ...img,
                 imageBytes: optimized.imageBytes,
                 mimeType: optimized.mimeType

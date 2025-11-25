@@ -45,6 +45,7 @@ export interface SEOArticleResult {
   createdAt: number;
   htmlTemplate?: string; // HTML шаблон страницы
   finalHTML?: string; // Финальный HTML с вставленным контентом в шаблон
+  imageResolution?: { width: number; height: number; label: string; aspectRatio: string }; // Разрешение изображений
 }
 
 export interface ImagePlaceholder {
