@@ -6,10 +6,14 @@ if (!GOOGLE_AI_API_KEY) {
   throw new Error('GOOGLE_AI_API_KEY is missing');
 }
 
+// Тип для версии модели Gemini
+export type GeminiModelVersion = 'gemini-2.5-pro' | 'gemini-3-pro-preview';
+
 export async function streamTextViaGeminiDirect(
   prompt: string,
   onDelta: (chunk: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  modelVersion: GeminiModelVersion = 'gemini-2.5-pro',
 ): Promise<string> {
   const cleaned = prompt.trim();
 
@@ -22,9 +26,10 @@ export async function streamTextViaGeminiDirect(
 
   try {
     console.log('🚀 Starting Gemini generation for prompt:', cleaned.slice(0, 50));
+    console.log('📌 Using model:', modelVersion);
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:generateContent?key=${GOOGLE_AI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -41,11 +46,16 @@ export async function streamTextViaGeminiDirect(
             }
           ],
           generationConfig: {
-            temperature: 0.7,
+            // Для Gemini 3 используем дефолтное значение (не указываем или 1.0)
+            // Для Gemini 2.5 оставляем 0.7
+            ...(modelVersion === 'gemini-3-pro-preview'
+              ? {} // Gemini 3: используем дефолт (1.0)
+              : { temperature: 0.7 } // Gemini 2.5: явно указываем 0.7
+            ),
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 32768,
-          }
+            maxOutputTokens: 32768
+          },
         }),
         signal
       }
@@ -107,7 +117,8 @@ export async function streamTextViaGeminiDirect(
 export async function streamTextViaGeminiWithSearch(
   prompt: string,
   onDelta: (chunk: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  modelVersion: GeminiModelVersion = 'gemini-2.5-pro',
 ): Promise<{ text: string; groundingMetadata?: GroundingMetadata }> {
   const cleaned = prompt.trim();
 
@@ -120,9 +131,10 @@ export async function streamTextViaGeminiWithSearch(
 
   try {
     console.log('🔍 Starting Gemini generation with Google Search for prompt:', cleaned.slice(0, 50));
+    console.log('📌 Using model:', modelVersion);
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${GOOGLE_AI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:generateContent?key=${GOOGLE_AI_API_KEY}`,
       {
         method: 'POST',
         headers: {
@@ -144,11 +156,16 @@ export async function streamTextViaGeminiWithSearch(
             }
           ],
           generationConfig: {
-            temperature: 0.7,
+            // Для Gemini 3 используем дефолтное значение (не указываем или 1.0)
+            // Для Gemini 2.5 оставляем 0.7
+            ...(modelVersion === 'gemini-3-pro-preview'
+              ? {} // Gemini 3: используем дефолт (1.0)
+              : { temperature: 0.7 } // Gemini 2.5: явно указываем 0.7
+            ),
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 32768,
-          }
+            maxOutputTokens: 32768
+          },
         }),
         signal
       }

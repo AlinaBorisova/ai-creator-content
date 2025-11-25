@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { GeminiModelSelector, GeminiModelVersion } from './GeminiModelSelector';
 
 // Типы для разрешений
 export type ImageResolution = {
@@ -19,7 +20,7 @@ export const IMAGE_RESOLUTIONS: ImageResolution[] = [
 ];
 
 interface SEOArticleFormProps {
-  onGenerate: (prompt: string, htmlTemplate: string, imageResolution: ImageResolution) => void;
+  onGenerate: (prompt: string, htmlTemplate: string, imageResolution: ImageResolution, modelVersion: GeminiModelVersion) => void;
   isStreaming: boolean;
   isParsingPrompts: boolean;
   isGeneratingImages: boolean;
@@ -38,6 +39,7 @@ export function SEOArticleForm({
   const [imageResolution, setImageResolution] = useState<ImageResolution>(IMAGE_RESOLUTIONS[0]); // По умолчанию Дзен
   const [isResolutionDropdownOpen, setIsResolutionDropdownOpen] = useState(false);
   const resolutionDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<GeminiModelVersion>('gemini-2.5-pro');
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -65,7 +67,7 @@ export function SEOArticleForm({
     }
 
     setPromptError(null);
-    onGenerate(prompt, htmlTemplate, imageResolution);
+    onGenerate(prompt, htmlTemplate, imageResolution, selectedGeminiModel);
   };
 
   return (
@@ -113,6 +115,18 @@ export function SEOArticleForm({
           </p>
         </div>
       )}
+
+      {/* Выбор версии модели Gemini */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Версия модели Gemini
+        </label>
+        <GeminiModelSelector
+          selectedModel={selectedGeminiModel}
+          onModelChange={setSelectedGeminiModel}
+          disabled={isStreaming || isParsingPrompts || isGeneratingImages}
+        />
+      </div>
 
       {/* Выбор разрешения изображений */}
       <div className="relative inline-block" ref={resolutionDropdownRef}>

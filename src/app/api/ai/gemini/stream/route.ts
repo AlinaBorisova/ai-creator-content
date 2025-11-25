@@ -1,15 +1,22 @@
 import { NextRequest } from 'next/server';
-import { streamTextViaGeminiDirect } from '@/lib/gemini';
+import { streamTextViaGeminiDirect, GeminiModelVersion } from '@/lib/gemini';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt } = await request.json();
+    const { prompt, modelVersion = 'gemini-2.5-pro' } = await request.json();
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response('Invalid prompt', { status: 400 });
     }
 
+    // Валидация версии модели
+    const validModelVersion: GeminiModelVersion = 
+      (modelVersion === 'gemini-3-pro-preview' || modelVersion === 'gemini-2.5-pro')
+        ? modelVersion
+        : 'gemini-2.5-pro';
+
     console.log('🎯 API Route: Starting generation for prompt:', prompt.slice(0, 50));
+    console.log('📌 Using model:', validModelVersion);
 
     const encoder = new TextEncoder();
     const abortController = new AbortController();
@@ -23,7 +30,8 @@ export async function POST(request: NextRequest) {
               const data = JSON.stringify({ delta: chunk });
               controller.enqueue(encoder.encode(`${data}\n`));
             },
-            abortController.signal
+            abortController.signal,
+            validModelVersion
           );
           
           // Отправляем сигнал завершения

@@ -31,6 +31,7 @@ import { VideoSettings } from '../components/VideoSettings';
 import { VideoResults } from '../components/VideoResults';
 import { ImageIcon, VideoIcon } from '../components/Icons';
 import { ResearchResults } from '../components/ResearchResults';
+import { GeminiModelSelector, GeminiModelVersion } from '../components/GeminiModelSelector';
 
 export default function AIPage() {
   const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ export default function AIPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isImagesDropdownOpen, setIsImagesDropdownOpen] = useState(false);
   const [selectedImageModel, setSelectedImageModel] = useState<string | null>(null);
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<GeminiModelVersion>('gemini-2.5-pro');
   const [currentPromptValue, setCurrentPromptValue] = useState<string>('');
   const [requestCount, setRequestCount] = useState<number>(1);
 
@@ -294,7 +296,7 @@ RULES:
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: researchPrompt }),
+        body: JSON.stringify({ prompt: researchPrompt, modelVersion: selectedGeminiModel }),
         signal: controller.signal
       })
         .then(response => {
@@ -390,7 +392,7 @@ RULES:
     for (let i = 0; i < count; i++) {
       startResearchStream(i);
     }
-  }, [setStreams, appendDelta, markDone, updateGroundingMetadata]);
+  }, [setStreams, appendDelta, markDone, updateGroundingMetadata, selectedGeminiModel]);
 
   const onSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -497,7 +499,7 @@ RULES:
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt: finalPrompt }),
+        body: JSON.stringify({ prompt: finalPrompt, modelVersion: selectedGeminiModel }),
         signal: controller.signal
       })
         .then(response => {
@@ -587,7 +589,7 @@ RULES:
     for (let i = 0; i < requestCount; i++) {
       startStream(i);
     }
-  }, [prompt, mode, selectedImageModel, imageState, imageGeneration, videoState, videoGeneration, setStreams, appendDelta, markDone, handleResearchMode, requestCount]);
+  }, [prompt, mode, selectedImageModel, selectedGeminiModel, imageState, imageGeneration, videoState, videoGeneration, setStreams, appendDelta, markDone, handleResearchMode, requestCount]);
 
 
   const onImageToVideoSubmit = useCallback(() => {
@@ -884,10 +886,23 @@ RULES:
               />
             )}
 
+            {(mode === 'text' || mode === 'html' || mode === 'research') && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Версия модели Gemini
+                </label>
+                <GeminiModelSelector
+                  selectedModel={selectedGeminiModel}
+                  onModelChange={setSelectedGeminiModel}
+                  disabled={isStreaming}
+                />
+              </div>
+            )}
+
             {/* Показываем SEOArticleForm для режима seo-article */}
             {mode === 'seo-article' ? (
               <SEOArticleForm
-                onGenerate={(promptText, htmlTemplate, imageResolution) => {
+                onGenerate={(promptText, htmlTemplate, imageResolution, modelVersion) => {
                   const topicMatch = promptText.match(/тема:\s*\[([^\]]+)\]/i);
                   const queryMatch = promptText.match(/запросу:\s*\[([^\]]+)\]/i);
                   
@@ -896,7 +911,8 @@ RULES:
                     topicMatch ? topicMatch[1] : undefined,
                     queryMatch ? queryMatch[1] : undefined,
                     htmlTemplate,
-                    imageResolution
+                    imageResolution,
+                    modelVersion
                   );
                 }}
                 isStreaming={seoArticle.isGeneratingText || seoArticle.isGeneratingImages}

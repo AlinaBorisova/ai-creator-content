@@ -3,6 +3,7 @@ import { SEOArticleResult, ImagePlaceholder, GeneratedImage } from '@/types/stre
 import { extractImagePrompts, updateImagePlaceholderInHTML } from '@/utils/seoArticleUtils';
 import { optimizeImage } from '@/utils/imageUtils';
 import { ImageResolution } from '@/app/components/SEOArticleForm';
+import { GeminiModelVersion } from '@/lib/gemini';
 
 export function useSEOArticle() {
   const [articleResult, setArticleResult] = useState<SEOArticleResult | null>(null);
@@ -274,10 +275,11 @@ export function useSEOArticle() {
     topic?: string,
     searchQuery?: string,
     htmlTemplate?: string,
-    imageResolution?: ImageResolution
+    imageResolution?: ImageResolution,
+    modelVersion: GeminiModelVersion = 'gemini-2.5-pro',
   ) => {
     const resolution = imageResolution || { width: 1408, height: 768, label: 'Дзен', aspectRatio: '16:9' };
-    
+
     setIsGeneratingText(true);
     setArticleResult({
       id: `article-${Date.now()}`,
@@ -299,7 +301,7 @@ export function useSEOArticle() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt, topic, searchQuery }),
+        body: JSON.stringify({ prompt, topic, searchQuery, modelVersion }),
         signal: controller.signal
       });
 

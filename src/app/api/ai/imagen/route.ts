@@ -66,7 +66,7 @@ export async function translateToEnglish(text: string): Promise<string> {
               threshold: "BLOCK_MEDIUM_AND_ABOVE"
             },
             {
-              category: "HARM_CATEGORY_HATE_SPEECH", 
+              category: "HARM_CATEGORY_HATE_SPEECH",
               threshold: "BLOCK_MEDIUM_AND_ABOVE"
             },
             {
@@ -110,7 +110,7 @@ export async function translateToEnglish(text: string): Promise<string> {
       console.error('❌ No candidates in translation response:', data);
       return text;
     }
-    
+
     if (!data.candidates[0]?.content?.parts?.[0]?.text) {
       console.error('❌ No text content in translation response:', data);
       return text;
@@ -272,9 +272,21 @@ export async function POST(request: NextRequest) {
         statusText: response.statusText,
         error: errorData
       });
+    
+      // Парсим JSON ошибки, если это возможно
+      let errorMessage = 'Failed to generate images';
+    
+      try {
+        const parsedError = JSON.parse(errorData);
+        if (parsedError.error?.message) {
+          errorMessage = parsedError.error.message;
+        }
+      } catch {
+        // Если не JSON, используем как есть
+      }
 
       return NextResponse.json({
-        error: 'Failed to generate images',
+        error: errorMessage,
         status: response.status,
         details: errorData
       }, { status: response.status });
