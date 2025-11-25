@@ -35,6 +35,29 @@ export interface VideoGenerationResult {
   model?: VideoModel;
 }
 
+export interface SEOArticleResult {
+  id: string;
+  prompt: string;
+  htmlContent: string; // Готовая HTML статья с изображениями
+  imagePlaceholders: ImagePlaceholder[]; // Места для изображений
+  status: 'idle' | 'generating-text' | 'generating-images' | 'done' | 'error';
+  error?: string;
+  createdAt: number;
+  htmlTemplate?: string; // HTML шаблон страницы
+  finalHTML?: string; // Финальный HTML с вставленным контентом в шаблон
+}
+
+export interface ImagePlaceholder {
+  id: string; // Уникальный ID для идентификации
+  prompt: string; // Промпт для генерации изображения
+  position: number; // Позиция в тексте (индекс символа)
+  images: GeneratedImage[]; // Сгенерированные изображения
+  status: 'pending' | 'generating' | 'done' | 'error';
+  error?: string;
+  imageCount: number; // Количество изображений (1 или 2)
+  className?: string; // Класс контейнера (stati__img, seo__content-images и т.д.)
+}
+
 export interface GeneratedVideo {
   videoBytes: string;
   mimeType: string;
@@ -125,6 +148,6 @@ export interface ApiToken {
   expiresAt?: string;
 }
 
-export type Mode = 'text' | 'html' | 'images' | 'videos' | 'research';
+export type Mode = 'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article';
 
 export const PANELS_COUNT = 1;

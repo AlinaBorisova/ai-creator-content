@@ -45,7 +45,7 @@ export default function HistoryPanel({
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-200">
-            История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : mode === 'research' ? 'Исследование' : 'Текст'}            </h2>
+              История: {mode === 'images' ? 'Изображения' : mode === 'html' ? 'HTML' : mode === 'videos' ? 'Видео' : mode === 'research' ? 'Исследование' : mode === 'seo-article' ? 'SEO Статьи' : 'Текст'}            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-200 transition-colors cursor-pointer"
@@ -62,13 +62,13 @@ export default function HistoryPanel({
             <div className="mb-4">
               <button
                 onClick={() => {
-                  if (confirm(`Очистить всю историю ${
-                    mode === 'images' ? 'изображений' 
-                    : mode === 'html' ? 'HTML' 
-                    : mode === 'videos' ? 'видео'
-                    : mode === 'research' ? 'research'
-                    : 'текста'
-                  }?`)) {
+                  if (confirm(`Очистить всю историю ${mode === 'images' ? 'изображений'
+                      : mode === 'html' ? 'HTML'
+                        : mode === 'videos' ? 'видео'
+                          : mode === 'research' ? 'research'
+                            : mode === 'seo-article' ? 'SEO статей'
+                            : 'текста'
+                    }?`)) {
                     onClearHistory();
                   }
                 }}
@@ -145,7 +145,7 @@ export default function HistoryPanel({
                               />
                             </div>
                           ) : null}
-                          
+
                           <div className="flex-1 min-w-0">
                             {/* Показываем промпт только если нет превью или не режим images */}
                             {!(mode === 'images' && previewImage) && (
@@ -169,7 +169,7 @@ export default function HistoryPanel({
                               })}
                             </p>
                           </div>
-                          
+
                           {/* Индикатор наличия результатов */}
                           <div className="ml-2 flex-shrink-0">
                             <div className="w-2 h-2 bg-green-500 rounded-full" title="Кликните для загрузки результатов" />

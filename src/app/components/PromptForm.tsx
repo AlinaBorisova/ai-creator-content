@@ -10,7 +10,7 @@ interface PromptFormProps {
     error?: string;
     touched: boolean;
   };
-  mode: 'text' | 'html' | 'images' | 'videos' | 'research';
+  mode: 'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article';
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   isStreaming: boolean;
   isParsingPrompts: boolean;

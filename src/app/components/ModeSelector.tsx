@@ -1,8 +1,8 @@
-import { TextIcon, ImageIcon, VideoIcon, GlobeIcon, SearchIcon } from './Icons';
+import { TextIcon, ImageIcon, VideoIcon, GlobeIcon, SearchIcon, DocumentIcon } from './Icons';
 
 interface ModeSelectorProps {
-  mode: 'text' | 'html' | 'images' | 'videos' | 'research';
-  onModeChange: (mode: 'text' | 'html' | 'images' | 'videos' | 'research') => void;
+  mode: 'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article';
+  onModeChange: (mode: 'text' | 'html' | 'images' | 'videos' | 'research' | 'seo-article') => void;
   selectedImageModel: string | null;
   onImageModelChange: (model: string | null) => void;
   isImagesDropdownOpen: boolean;
@@ -47,6 +47,15 @@ export function ModeSelector({
           }`}
       >
         <SearchIcon className="w-4 h-4" /> Исследование
+      </button>
+      <button
+        onClick={() => onModeChange('seo-article')}
+        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${mode === 'seo-article'
+            ? 'bg-(--btn-active-color) text-white'
+            : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+          }`}
+      >
+        <DocumentIcon className="w-4 h-4" /> SEO Статья
       </button>
       <div className="relative">
         <button
