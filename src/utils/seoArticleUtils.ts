@@ -38,18 +38,26 @@ export function extractImagePrompts(htmlContent: string): ImagePlaceholder[] {
  */
 export function insertImagesIntoHTML(
   htmlContent: string,
-  placeholders: ImagePlaceholder[]
+  placeholders: ImagePlaceholder[],
+  imageResolution?: { width: number; height: number; label: string; aspectRatio: string }
 ): string {
   let result = htmlContent;
 
   // Сортируем по позиции в обратном порядке, чтобы не сбить индексы при замене
   const sortedPlaceholders = [...placeholders].sort((a, b) => b.position - a.position);
 
+
+  // Формируем стиль на основе параметров разрешения из UI
+  let imageStyle = 'width: auto; height: auto;';
+  if (imageResolution) {
+    imageStyle = `width: ${imageResolution.width}px; height: ${imageResolution.height}px; max-width: 100%; object-fit: contain;`;
+  }
+
   for (const placeholder of sortedPlaceholders) {
     const className = placeholder.className || 'stati__img';
     const escapedClassName = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
+
     // Ищем div с нужным классом и промптом
     const regex = new RegExp(
       `<div\\s+class="${escapedClassName}"[^>]*data-image-prompt="${escapedPrompt}"[^>]*data-image-count="\\d+"[^>]*>\\s*<!--[^>]*-->\\s*</div>`,
@@ -59,13 +67,13 @@ export function insertImagesIntoHTML(
     // Находим соответствующий div начиная с позиции placeholder
     const searchStart = result.substring(placeholder.position);
     const match = searchStart.match(regex);
-    
+
     if (match) {
       const fullMatch = match[0];
       const imageTags = placeholder.images
         .map((img, idx) => {
           const imageData = `data:${img.mimeType};base64,${img.imageBytes}`;
-          return `<img src="${imageData}" alt="Image ${idx + 1}" style="max-height: 550px; width: auto; height: auto;" loading="lazy" decoding="async" fetchpriority="low" />`;
+          return `<img src="${imageData}" alt="Image ${idx + 1}" style="${imageStyle}" loading="lazy" decoding="async" fetchpriority="low" />`;
         })
         .join('\n     ');
 
@@ -85,13 +93,14 @@ export function insertImagesIntoHTML(
 export function updateImagePlaceholderInHTML(
   htmlContent: string,
   placeholderId: string,
-  placeholder: ImagePlaceholder
+  placeholder: ImagePlaceholder,
+  imageResolution?: { width: number; height: number; label: string; aspectRatio: string }
 ): string {
   // Находим div с нужным placeholder (поддерживает любые классы)
   // Экранируем специальные символы в промпте для использования в regex
   const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const escapedClassName = (placeholder.className || 'stati__img').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   // Ищем div с нужным классом и промптом
   const regex = new RegExp(
     `<div\\s+class="${escapedClassName}"[^>]*data-image-prompt="${escapedPrompt}"[^>]*data-image-count="\\d+"[^>]*>([\\s\\S]*?)</div>`,
@@ -103,14 +112,20 @@ export function updateImagePlaceholderInHTML(
 
   while ((match = regex.exec(htmlContent)) !== null) {
     const fullMatch = match[0];
-    
+
     // Используем сохраненный класс или дефолтный
     const className = placeholder.className || 'stati__img';
+
+    // Формируем стиль на основе параметров разрешения из UI
+    let imageStyle = 'width: auto; height: auto;';
+    if (imageResolution) {
+      imageStyle = `width: ${imageResolution.width}px; height: ${imageResolution.height}px; max-width: 100%; object-fit: contain;`;
+    }
 
     const imageTags = placeholder.images
       .map((img, idx) => {
         const imageData = `data:${img.mimeType};base64,${img.imageBytes}`;
-        return `<img src="${imageData}" alt="Image ${idx + 1}" style="max-height: 550px; width: auto; height: auto;" loading="lazy" decoding="async" fetchpriority="low" />`;
+        return `<img src="${imageData}" alt="Image ${idx + 1}" style="${imageStyle}" loading="lazy" decoding="async" fetchpriority="low" />`;
       })
       .join('\n     ');
 
