@@ -36,7 +36,7 @@ export const copyPromptToClipboard = async (promptText: string) => {
  * Оптимизирует изображение: масштабирует до целевых размеров и сжимает качество
  * @param imageBytes - base64 строка изображения (без префикса data:image/...;base64,)
  * @param mimeType - MIME тип изображения (например, 'image/jpeg', 'image/png')
- * @param quality - качество сжатия от 0 до 1 (по умолчанию 0.7)
+ * @param quality - качество сжатия от 0 до 1 (по умолчанию 0.8)
  * @param targetWidth - целевая ширина (опционально, если не указана - сохраняется оригинал)
  * @param targetHeight - целевая высота (опционально, если не указана - сохраняется оригинал)
  * @returns Promise с оптимизированным base64 изображением

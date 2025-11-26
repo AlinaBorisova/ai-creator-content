@@ -3,17 +3,22 @@
 import { SEOArticleResult } from '@/types/stream';
 import { useState } from 'react';
 import { ExternalLinkIcon } from './Icons';
+import Image from 'next/image';
 
 interface SEOArticleResultsProps {
   articleResult: SEOArticleResult | null;
   onRegenerateImage: (placeholderId: string) => void;
   onAbortImageGeneration: (placeholderId: string) => void;
+  onRegenerateSingleImage: (placeholderId: string, imageIndex: number) => void;
+  onDownloadImage: (imageBytes: string, mimeType: string, filename: string) => void;
 }
 
 export function SEOArticleResults({
   articleResult,
   onRegenerateImage,
-  onAbortImageGeneration
+  onAbortImageGeneration,
+  onRegenerateSingleImage,
+  onDownloadImage
 }: SEOArticleResultsProps) {
   const [showRawHTML, setShowRawHTML] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
@@ -262,14 +267,14 @@ export function SEOArticleResults({
                   <div className="flex gap-1">
                     <button
                       onClick={(e) => copyErrorToClipboard(error || '', e)}
-                      className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+                      className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded cursor-pointer"
                       title="Копировать ошибку"
                     >
                       📋
                     </button>
                     <button
                       onClick={() => toggleErrorDetails('article-error')}
-                      className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+                      className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded cursor-pointer"
                       title={expandedErrors.has('article-error') ? 'Скрыть детали' : 'Показать детали'}
                     >
                       {expandedErrors.has('article-error') ? '▲' : '▼'}
@@ -282,14 +287,14 @@ export function SEOArticleResults({
           <div className="flex gap-2">
             <button
               onClick={() => setShowRawHTML(!showRawHTML)}
-              className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors"
+              className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 transition-colors cursor-pointer"
             >
               {showRawHTML ? 'Показать результат' : 'Показать HTML'}
             </button>
             {status === 'done' && htmlContent && (
               <button
                 onClick={openInNewWindow}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 cursor-pointer"
                 title="Открыть в новом окне"
               >
                 <ExternalLinkIcon className="w-4 h-4" />
@@ -307,7 +312,7 @@ export function SEOArticleResults({
         <div className="mb-4 p-4 bg-gray-800 rounded-lg">
           <h3 className="text-lg font-semibold text-gray-200 mb-3">Изображения</h3>
           <div className="space-y-2">
-            {imagePlaceholders.map((placeholder) => {
+            {imagePlaceholders.map((placeholder, placeholderIndex) => {
               const placeholderErrorInfo = placeholder.error ? getErrorInfo(placeholder.error) : null;
               
               return (
@@ -324,6 +329,14 @@ export function SEOArticleResults({
                       <p className="text-sm text-gray-400 mb-1">Промпт:</p>
                       <p className="text-sm text-gray-300 mb-2">{placeholder.prompt}</p>
                       
+                      {/* Показываем переведенный промпт, если он был переведен */}
+                      {placeholder.translatedPrompt && placeholder.wasTranslated && (
+                        <div className="mt-2 p-2 bg-gray-700/50 rounded text-xs mb-2">
+                          <div className="text-gray-500 mb-1">🌐 Translated:</div>
+                          <div className="text-gray-300">{placeholder.translatedPrompt}</div>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-xs px-2 py-1 rounded ${
                           placeholder.status === 'done' ? 'bg-green-900 text-green-300' :
@@ -342,7 +355,69 @@ export function SEOArticleResults({
                             {placeholder.images.length} изображений
                           </span>
                         )}
+
+                        {/* Индикатор славянских подсказок */}
+                        {placeholder.hasSlavicPrompts && (
+                          <span className="text-xs px-2 py-1 rounded bg-blue-900/30 text-blue-300" title="Применены подсказки славянской внешности">
+                            🇷🇺 Slavic
+                          </span>
+                        )}
                       </div>
+
+                      {/* Отображение изображений с кнопками скачивания */}
+                      {placeholder.images.length > 0 && placeholder.status === 'done' && (
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {placeholder.images.map((image, imageIndex) => {
+                            const fileExtension = image.mimeType.split('/')[1] || 'png';
+                            const filename = `seo-article-${placeholderIndex + 1}-${imageIndex + 1}.${fileExtension}`;
+                            
+                            return (
+                              <div key={imageIndex} className="relative bg-gray-800 rounded-lg p-2 border border-gray-700">
+                                {/* Кнопки управления */}
+                                <div className="absolute top-2 right-2 z-10 flex gap-1">
+                                  {/* Кнопка перегенерации */}
+                                  <button
+                                    onClick={() => onRegenerateSingleImage(placeholder.id, imageIndex)}
+                                    className="bg-blue-900/80 hover:bg-blue-800 text-blue-200 hover:text-white transition-colors p-2 rounded cursor-pointer"
+                                    title="Перегенерировать это изображение"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                  </button>
+                                  {/* Кнопка скачивания */}
+                                  <button
+                                    onClick={() => onDownloadImage(
+                                      image.imageBytes,
+                                      image.mimeType,
+                                      filename
+                                    )}
+                                    className="bg-gray-900/80 hover:bg-gray-800 text-gray-300 hover:text-white transition-colors p-2 rounded cursor-pointer"
+                                    title="Скачать изображение"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                
+                                {/* Изображение */}
+                                <div className="flex items-center justify-center max-h-[300px] overflow-hidden rounded">
+                                  <Image
+                                    src={`data:${image.mimeType};base64,${image.imageBytes}`}
+                                    alt={`Generated image ${placeholderIndex + 1}-${imageIndex + 1}`}
+                                    className="max-w-full max-h-[300px] object-contain"
+                                    width={500}
+                                    height={500}
+                                    style={{ maxHeight: '300px' }}
+                                    unoptimized
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                       
                       {/* Детальное отображение ошибки placeholder */}
                       {placeholder.status === 'error' && placeholderErrorInfo && (
@@ -364,6 +439,14 @@ export function SEOArticleResults({
                               )}
                             </div>
                             <div className="flex gap-1">
+                              {/* Кнопка повтора при ошибке */}
+                              <button
+                                onClick={() => onRegenerateImage(placeholder.id)}
+                                className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors cursor-pointer"
+                                title="Повторить генерацию"
+                              >
+                                Повторить
+                              </button>
                               {placeholder.error && (
                                 <button
                                   onClick={(e) => copyErrorToClipboard(placeholder.error || '', e)}
@@ -383,19 +466,19 @@ export function SEOArticleResults({
                       {placeholder.status === 'generating' && (
                         <button
                           onClick={() => onAbortImageGeneration(placeholder.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
+                          className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors cursor-pointer"
                         >
                           Отменить
                         </button>
                       )}
-                      {(placeholder.status === 'done' || placeholder.status === 'error') && (
+                      {/* {(placeholder.status === 'done' || placeholder.status === 'error') && (
                         <button
                           onClick={() => onRegenerateImage(placeholder.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors cursor-pointer"
                         >
                           {placeholder.status === 'error' ? 'Повторить' : 'Перегенерировать'}
                         </button>
-                      )}
+                      )} */}
                     </div>
                   </div>
                 </div>
@@ -467,7 +550,7 @@ export function SEOArticleResults({
                     : 'Полный HTML с шаблоном скопирован в буфер обмена')
                   : 'HTML скопирован в буфер обмена');
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
             >
               {articleResult.finalHTML ? 'Копировать полный HTML' : 'Копировать HTML'}
             </button>
