@@ -93,8 +93,8 @@ export default function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#191919] text-white p-4">
-      <div className="bg-gray-800 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-(--background-color) text-white p-4">
+      <div className="border border-gray-700 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
         <h1 className="text-3xl font-bold mb-6">Enter Access Token</h1>
         <form onSubmit={handleLogin} className="space-y-4">
           <input
@@ -102,7 +102,7 @@ export default function HomePage() {
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="Enter your token"
-            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
           {error && (
@@ -111,7 +111,7 @@ export default function HomePage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-3 rounded-lg transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-3 rounded-lg transition-colors cursor-pointer"
           >
             {isLoading ? 'Verifying...' : 'Login'}
           </button>
