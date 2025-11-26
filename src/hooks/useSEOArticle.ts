@@ -232,6 +232,12 @@ export function useSEOArticle() {
         const data = await response.json();
         let images: GeneratedImage[] = data.images || [];
 
+        // Извлекаем информацию о переводе из ответа API
+        const translation = data.translation;
+        const translatedPrompt = translation?.translated || placeholder.prompt;
+        const wasTranslated = translation?.wasTranslated || false;
+        const hasSlavicPrompts = translation?.hasSlavicPrompts || false;
+
         // Оптимизируем изображения сразу после получения
         if (images.length > 0) {
           console.log('🔄 Optimizing images...');
@@ -242,7 +248,7 @@ export function useSEOArticle() {
                 const optimized = await optimizeImage(
                   img.imageBytes,
                   img.mimeType,
-                  0.7, // качество 0.7
+                  0.8, // качество 0.8
                   resolution.width,  // масштабируем до ширины пользователя
                   resolution.height  // масштабируем до высоты пользователя
                 );
@@ -260,13 +266,20 @@ export function useSEOArticle() {
           console.log('✅ Images optimized');
         }
 
-        // Обновляем placeholder с изображениями
+        // Обновляем placeholder с изображениями и информацией о переводе
         setArticleResult(prev => {
           if (!prev) return null;
 
           const updatedPlaceholders = prev.imagePlaceholders.map(p =>
             p.id === placeholder.id
-              ? { ...p, images, status: 'done' as const }
+              ? { 
+                  ...p, 
+                  images, 
+                  status: 'done' as const,
+                  translatedPrompt,
+                  wasTranslated,
+                  hasSlavicPrompts
+                }
               : p
           );
 
@@ -717,6 +730,231 @@ export function useSEOArticle() {
   }, [articleResult, insertContentIntoTemplate]);
 
   /**
+   * Перегенерирует одно конкретное изображение в placeholder'е
+   */
+  const regenerateSingleImage = useCallback(async (placeholderId: string, imageIndex: number) => {
+    const article = articleResult;
+    if (!article) return;
+
+    const placeholder = article.imagePlaceholders.find(p => p.id === placeholderId);
+    if (!placeholder) return;
+
+    // Проверяем, что индекс валидный
+    if (imageIndex < 0 || imageIndex >= placeholder.images.length) {
+      console.error(`Invalid image index ${imageIndex} for placeholder ${placeholderId}`);
+      return;
+    }
+
+    // Создаем уникальный ID для этого конкретного изображения
+    const singleImageControllerId = `${placeholderId}-${imageIndex}`;
+    
+    // Отменяем предыдущую генерацию, если она идет
+    const existingController = imageControllersRef.current.get(singleImageControllerId);
+    if (existingController) {
+      existingController.abort();
+    }
+
+    const controller = new AbortController();
+    imageControllersRef.current.set(singleImageControllerId, controller);
+
+    // Обновляем статус placeholder'а на generating, но сохраняем остальные изображения
+    setArticleResult(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        imagePlaceholders: prev.imagePlaceholders.map(p =>
+          p.id === placeholderId ? { ...p, status: 'generating' } : p
+        )
+      };
+    });
+
+    try {
+      const response = await fetch('/api/ai/imagen', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: placeholder.prompt,
+          numberOfImages: 1, // Генерируем только одно изображение
+          imageSize: '1K',
+          aspectRatio: article?.imageResolution?.aspectRatio || '16:9',
+          modelVersion: 'imagen-4.0-generate-001'
+        }),
+        signal: controller.signal
+      });
+
+      // Обработка ошибок
+      if (!response.ok) {
+        let errorMessage = `Failed to regenerate image: ${response.status}`;
+        try {
+          const responseClone = response.clone();
+          const errorData = await responseClone.json().catch(() => null);
+
+          if (errorData) {
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            } else if (errorData.details) {
+              if (typeof errorData.details === 'string') {
+                try {
+                  const parsed = JSON.parse(errorData.details);
+                  if (parsed.error?.message) {
+                    errorMessage = parsed.error.message;
+                  }
+                } catch {
+                  errorMessage = errorData.details;
+                }
+              } else if (errorData.details.error?.message) {
+                errorMessage = errorData.details.error.message;
+              }
+            }
+          } else {
+            const errorText = await response.text().catch(() => '');
+            if (errorText) {
+              errorMessage = `${errorMessage}. ${errorText}`;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        const fullErrorMessage = response.status === 429
+          ? `Rate limit exceeded (429). ${errorMessage}`
+          : `${errorMessage} (Status: ${response.status})`;
+
+        console.error(`❌ Single image regeneration failed for ${singleImageControllerId}:`, fullErrorMessage);
+
+        // Восстанавливаем статус done, так как это ошибка только одного изображения
+        setArticleResult(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            imagePlaceholders: prev.imagePlaceholders.map(p =>
+              p.id === placeholderId ? { ...p, status: 'done' } : p
+            )
+          };
+        });
+
+        return;
+      }
+
+      const data = await response.json();
+      let newImages: GeneratedImage[] = data.images || [];
+
+      // Извлекаем информацию о переводе из ответа API
+      const translation = data.translation;
+      const translatedPrompt = translation?.translated || placeholder.prompt;
+      const wasTranslated = translation?.wasTranslated || false;
+      const hasSlavicPrompts = translation?.hasSlavicPrompts || false;
+
+      // Оптимизируем новое изображение
+      if (newImages.length > 0) {
+        console.log('🔄 Optimizing regenerated single image...');
+        const resolution = article.imageResolution || { width: 1408, height: 768, label: 'Дзен', aspectRatio: '16:9' };
+        newImages = await Promise.all(
+          newImages.map(async (img) => {
+            try {
+              const optimized = await optimizeImage(
+                img.imageBytes,
+                img.mimeType,
+                0.8,
+                resolution.width,
+                resolution.height
+              );
+              return {
+                ...img,
+                imageBytes: optimized.imageBytes,
+                mimeType: optimized.mimeType
+              };
+            } catch (error) {
+              console.error('Error optimizing image, using original:', error);
+              return img;
+            }
+          })
+        );
+        console.log('✅ Regenerated single image optimized');
+      }
+
+      // Заменяем только одно изображение в массиве
+      setArticleResult(prev => {
+        if (!prev) return null;
+
+        const updatedPlaceholders = prev.imagePlaceholders.map(p => {
+          if (p.id === placeholderId) {
+            const updatedImages = [...p.images];
+            if (newImages.length > 0 && imageIndex >= 0 && imageIndex < updatedImages.length) {
+              // Заменяем изображение по индексу
+              updatedImages[imageIndex] = newImages[0];
+            }
+            
+            // Обновляем информацию о переводе для placeholder'а
+            return {
+              ...p,
+              images: updatedImages,
+              status: 'done' as const,
+              translatedPrompt: translatedPrompt !== p.prompt ? translatedPrompt : p.translatedPrompt,
+              wasTranslated: wasTranslated || p.wasTranslated,
+              hasSlavicPrompts: hasSlavicPrompts || p.hasSlavicPrompts
+            };
+          }
+          return p;
+        });
+
+        // Находим обновленный placeholder для обновления HTML
+        const updatedPlaceholder = updatedPlaceholders.find(p => p.id === placeholderId);
+        if (!updatedPlaceholder) {
+          return {
+            ...prev,
+            imagePlaceholders: updatedPlaceholders
+          };
+        }
+
+        // Обновляем HTML с новым изображением
+        let updatedHTML = prev.htmlContent;
+        updatedHTML = updateImagePlaceholderInHTML(
+          updatedHTML,
+          placeholderId,
+          updatedPlaceholder,
+          prev.imageResolution
+        );
+
+        // Обновляем finalHTML если есть шаблон
+        const updatedFinalHTML = prev.htmlTemplate && prev.htmlTemplate.trim()
+          ? insertContentIntoTemplate(updatedHTML, prev.htmlTemplate)
+          : updatedHTML;
+
+        return {
+          ...prev,
+          htmlContent: updatedHTML,
+          imagePlaceholders: updatedPlaceholders,
+          finalHTML: updatedFinalHTML
+        };
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log(`Single image regeneration for ${singleImageControllerId} aborted`);
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`❌ Error regenerating single image for ${singleImageControllerId}:`, errorMessage);
+
+      // Восстанавливаем статус done
+      setArticleResult(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          imagePlaceholders: prev.imagePlaceholders.map(p =>
+            p.id === placeholderId ? { ...p, status: 'done' } : p
+          )
+        };
+      });
+    } finally {
+      imageControllersRef.current.delete(singleImageControllerId);
+    }
+  }, [articleResult, insertContentIntoTemplate]);
+
+  /**
    * Отменяет генерацию текста
    */
   const abortTextGeneration = useCallback(() => {
@@ -815,6 +1053,7 @@ export function useSEOArticle() {
     isGeneratingImages,
     generateArticleText,
     regenerateImage,
+    regenerateSingleImage,
     abortTextGeneration,
     abortImageGeneration,
     abortAll,

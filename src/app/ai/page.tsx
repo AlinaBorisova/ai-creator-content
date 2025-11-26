@@ -1013,7 +1013,9 @@ RULES:
                 <SEOArticleResults
                   articleResult={seoArticle.articleResult}
                   onRegenerateImage={seoArticle.regenerateImage}
+                  onRegenerateSingleImage={seoArticle.regenerateSingleImage}
                   onAbortImageGeneration={seoArticle.abortImageGeneration}
+                  onDownloadImage={downloadImage}
                 />
               ) : mode === 'research' ? (
                 <ResearchResults

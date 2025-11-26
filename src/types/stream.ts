@@ -57,6 +57,10 @@ export interface ImagePlaceholder {
   error?: string;
   imageCount: number; // Количество изображений (1 или 2)
   className?: string; // Класс контейнера (stati__img, seo__content-images и т.д.)
+  translatedPrompt?: string; // Переведенный промпт
+  hasSlavicPrompts?: boolean; // Применены ли славянские подсказки
+  wasTranslated?: boolean; // Был ли промпт переведен
+  allPositions?: number[]; // Все позиции, где используется этот промпт (для группировки одинаковых промптов)
 }
 
 export interface GeneratedVideo {
