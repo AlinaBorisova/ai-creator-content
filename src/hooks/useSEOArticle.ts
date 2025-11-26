@@ -140,8 +140,10 @@ export function useSEOArticle() {
       imagePlaceholders: placeholders.map(p => ({ ...p, status: 'generating' }))
     } : null);
 
-    // Генерируем изображения для каждого placeholder'а параллельно
-    const generationPromises = placeholders.map(async (placeholder) => {
+    // Функция для генерации одного изображения (без повторных попыток)
+    const generateImage = async (
+      placeholder: ImagePlaceholder
+    ): Promise<void> => {
       const controller = new AbortController();
       imageControllersRef.current.set(placeholder.id, controller);
 
@@ -164,8 +166,67 @@ export function useSEOArticle() {
           signal: controller.signal
         });
 
+        // Обработка ошибок без повторных попыток
         if (!response.ok) {
-          throw new Error(`Failed to generate images: ${response.status}`);
+          // Читаем детали ошибки
+          let errorMessage = `Failed to generate images: ${response.status}`;
+          try {
+            const responseClone = response.clone();
+            const errorData = await responseClone.json().catch(() => null);
+
+            if (errorData) {
+              if (errorData.error) {
+                errorMessage = errorData.error;
+              } else if (errorData.details) {
+                // Пытаемся извлечь сообщение из details
+                if (typeof errorData.details === 'string') {
+                  try {
+                    const parsed = JSON.parse(errorData.details);
+                    if (parsed.error?.message) {
+                      errorMessage = parsed.error.message;
+                    }
+                  } catch {
+                    errorMessage = errorData.details;
+                  }
+                } else if (errorData.details.error?.message) {
+                  errorMessage = errorData.details.error.message;
+                }
+              }
+            } else {
+              // Если не JSON, пытаемся прочитать как текст
+              const errorText = await response.text().catch(() => '');
+              if (errorText) {
+                errorMessage = `${errorMessage}. ${errorText}`;
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+
+          // Формируем полное сообщение об ошибке
+          const fullErrorMessage = response.status === 429
+            ? `Rate limit exceeded (429). ${errorMessage}`
+            : `${errorMessage} (Status: ${response.status})`;
+
+          console.error(`❌ Image generation failed for ${placeholder.id}:`, fullErrorMessage);
+
+          // Устанавливаем статус ошибки вместо выброса исключения
+          setArticleResult(prev => {
+            if (!prev) return null;
+
+            const updatedPlaceholders = prev.imagePlaceholders.map(p =>
+              p.id === placeholder.id
+                ? { ...p, status: 'error' as const, error: fullErrorMessage }
+                : p
+            );
+
+            return {
+              ...prev,
+              imagePlaceholders: updatedPlaceholders
+            };
+          });
+
+          return; // Выходим без выброса исключения
         }
 
         const data = await response.json();
@@ -178,7 +239,13 @@ export function useSEOArticle() {
             images.map(async (img) => {
               try {
                 // Используем разрешение из параметра функции (уже получено выше)
-                const optimized = await optimizeImage(img.imageBytes, img.mimeType, 0.65);
+                const optimized = await optimizeImage(
+                  img.imageBytes,
+                  img.mimeType,
+                  0.7, // качество 0.7
+                  resolution.width,  // масштабируем до ширины пользователя
+                  resolution.height  // масштабируем до высоты пользователя
+                );
                 return {
                   ...img,
                   imageBytes: optimized.imageBytes,
@@ -192,7 +259,7 @@ export function useSEOArticle() {
           );
           console.log('✅ Images optimized');
         }
-        
+
         // Обновляем placeholder с изображениями
         setArticleResult(prev => {
           if (!prev) return null;
@@ -214,7 +281,8 @@ export function useSEOArticle() {
             updatedHTML = updateImagePlaceholderInHTML(
               updatedHTML,
               placeholder.id,
-              { ...placeholder, images, status: 'done' }
+              { ...placeholder, images, status: 'done' },
+              prev.imageResolution
             );
           }
 
@@ -246,24 +314,52 @@ export function useSEOArticle() {
           return;
         }
 
-        console.error(`Error generating images for ${placeholder.id}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`❌ Error generating images for ${placeholder.id}:`, errorMessage);
+
         setArticleResult(prev => {
-          if (!prev) return null;
+          if (!prev) {
+            console.warn('⚠️ Cannot update error state: articleResult is null');
+            return null;
+          }
+
+          const updatedPlaceholders = prev.imagePlaceholders.map(p =>
+            p.id === placeholder.id
+              ? { ...p, status: 'error' as const, error: errorMessage }
+              : p
+          );
+
+          console.log(`✅ Error state updated for ${placeholder.id}:`, {
+            placeholderId: placeholder.id,
+            errorMessage,
+            status: 'error',
+            hasError: updatedPlaceholders.find(p => p.id === placeholder.id)?.error
+          });
+
           return {
             ...prev,
-            imagePlaceholders: prev.imagePlaceholders.map(p =>
-              p.id === placeholder.id
-                ? { ...p, status: 'error' as const, error: error instanceof Error ? error.message : 'Unknown error' }
-                : p
-            )
+            imagePlaceholders: updatedPlaceholders
           };
         });
       } finally {
         imageControllersRef.current.delete(placeholder.id);
       }
-    });
+    };
 
-    await Promise.all(generationPromises);
+    // Генерируем изображения последовательно с задержкой между запросами
+    for (let i = 0; i < placeholders.length; i++) {
+      const placeholder = placeholders[i];
+
+      // Добавляем задержку между запросами (кроме первого)
+      if (i > 0) {
+        const delay = 5000; // 5 секунд между запросами
+        console.log(`⏳ Waiting ${delay}ms before generating next image...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      await generateImage(placeholder);
+    }
+
     setIsGeneratingImages(false);
   }, [insertContentIntoTemplate]);
 
@@ -394,7 +490,7 @@ export function useSEOArticle() {
   }, [generateAllImages, insertContentIntoTemplate]);
 
   /**
-   * Перегенерирует конкретное изображение
+   * Перегенерирует конкретное изображение (без повторных попыток)
    */
   const regenerateImage = useCallback(async (placeholderId: string) => {
     const article = articleResult;
@@ -418,7 +514,7 @@ export function useSEOArticle() {
       return {
         ...prev,
         imagePlaceholders: prev.imagePlaceholders.map(p =>
-          p.id === placeholderId ? { ...p, status: 'generating', images: [] } : p
+          p.id === placeholderId ? { ...p, status: 'generating', images: [], error: undefined } : p
         )
       };
     });
@@ -429,18 +525,83 @@ export function useSEOArticle() {
         headers: {
           'Content-Type': 'application/json',
         },
-          body: JSON.stringify({
-            prompt: placeholder.prompt,
-            numberOfImages: placeholder.imageCount,
-            imageSize: '1K',
-            aspectRatio: article?.imageResolution?.aspectRatio || '16:9',
-            modelVersion: 'imagen-4.0-generate-001'
-          }),
-          signal: controller.signal
+        body: JSON.stringify({
+          prompt: placeholder.prompt,
+          numberOfImages: placeholder.imageCount,
+          imageSize: '1K',
+          aspectRatio: article?.imageResolution?.aspectRatio || '16:9',
+          modelVersion: 'imagen-4.0-generate-001'
+        }),
+        signal: controller.signal
+      });
+
+      // Обработка ошибок без повторных попыток
+      if (!response.ok) {
+        // Читаем детали ошибки
+        let errorMessage = `Failed to regenerate image: ${response.status}`;
+        try {
+          const responseClone = response.clone();
+          const errorData = await responseClone.json().catch(() => null);
+
+          if (errorData) {
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            } else if (errorData.details) {
+              // Пытаемся извлечь сообщение из details
+              if (typeof errorData.details === 'string') {
+                try {
+                  const parsed = JSON.parse(errorData.details);
+                  if (parsed.error?.message) {
+                    errorMessage = parsed.error.message;
+                  }
+                } catch {
+                  errorMessage = errorData.details;
+                }
+              } else if (errorData.details.error?.message) {
+                errorMessage = errorData.details.error.message;
+              }
+            }
+          } else {
+            // Если не JSON, пытаемся прочитать как текст
+            const errorText = await response.text().catch(() => '');
+            if (errorText) {
+              errorMessage = `${errorMessage}. ${errorText}`;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+
+        // Формируем полное сообщение об ошибке
+        const fullErrorMessage = response.status === 429
+          ? `Rate limit exceeded (429). ${errorMessage}`
+          : `${errorMessage} (Status: ${response.status})`;
+
+        console.error(`❌ Image regeneration failed for ${placeholderId}:`, fullErrorMessage);
+
+        // Устанавливаем статус ошибки вместо выброса исключения
+        setArticleResult(prev => {
+          if (!prev) return null;
+
+          const updatedPlaceholders = prev.imagePlaceholders.map(p =>
+            p.id === placeholderId
+              ? { ...p, status: 'error' as const, error: fullErrorMessage }
+              : p
+          );
+
+          // Проверяем, все ли изображения сгенерированы (или имеют ошибку)
+          const allDone = updatedPlaceholders.every(p =>
+            p.status === 'done' || p.status === 'error'
+          );
+
+          return {
+            ...prev,
+            imagePlaceholders: updatedPlaceholders,
+            status: allDone ? 'done' : prev.status
+          };
         });
 
-      if (!response.ok) {
-        throw new Error(`Failed to regenerate image: ${response.status}`);
+        return; // Выходим без выброса исключения
       }
 
       const data = await response.json();
@@ -452,7 +613,14 @@ export function useSEOArticle() {
         images = await Promise.all(
           images.map(async (img) => {
             try {
-              const optimized = await optimizeImage(img.imageBytes, img.mimeType, 0.65);              return {
+              const optimized = await optimizeImage(
+                img.imageBytes,
+                img.mimeType,
+                0.7, // качество 0.7
+                article?.imageResolution?.width,  // масштабируем до ширины пользователя
+                article?.imageResolution?.height  // масштабируем до высоты пользователя
+              );
+              return {
                 ...img,
                 imageBytes: optimized.imageBytes,
                 mimeType: optimized.mimeType
@@ -486,7 +654,8 @@ export function useSEOArticle() {
           updatedHTML = updateImagePlaceholderInHTML(
             updatedHTML,
             placeholderId,
-            { ...placeholder, images, status: 'done' }
+            { ...placeholder, images, status: 'done' },
+            prev.imageResolution
           );
         }
 
@@ -509,13 +678,18 @@ export function useSEOArticle() {
         return;
       }
 
-      console.error(`Error regenerating image for ${placeholderId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`❌ Error regenerating image for ${placeholderId}:`, errorMessage);
+
       setArticleResult(prev => {
-        if (!prev) return null;
+        if (!prev) {
+          console.warn('⚠️ Cannot update error state: articleResult is null');
+          return null;
+        }
 
         const updatedPlaceholders = prev.imagePlaceholders.map(p =>
           p.id === placeholderId
-            ? { ...p, status: 'error' as const, error: error instanceof Error ? error.message : 'Unknown error' }
+            ? { ...p, status: 'error' as const, error: errorMessage }
             : p
         );
 
@@ -523,6 +697,13 @@ export function useSEOArticle() {
         const allDone = updatedPlaceholders.every(p =>
           p.status === 'done' || p.status === 'error'
         );
+
+        console.log(`✅ Error state updated for ${placeholderId}:`, {
+          placeholderId,
+          errorMessage,
+          status: 'error',
+          hasError: updatedPlaceholders.find(p => p.id === placeholderId)?.error
+        });
 
         return {
           ...prev,
@@ -543,6 +724,8 @@ export function useSEOArticle() {
       textControllerRef.current.abort();
       textControllerRef.current = null;
     }
+    // Сбрасываем флаг генерации текста
+    setIsGeneratingText(false);
   }, []);
 
   /**
@@ -554,7 +737,65 @@ export function useSEOArticle() {
       controller.abort();
       imageControllersRef.current.delete(placeholderId);
     }
+    // Обновляем статус placeholder'а на 'error' или 'pending'
+    setArticleResult(prev => {
+      if (!prev) return null;
+      
+      const updatedPlaceholders = prev.imagePlaceholders.map(p =>
+        p.id === placeholderId && p.status === 'generating'
+          ? { ...p, status: 'pending' as const }
+          : p
+      );
+      
+      // Проверяем, остались ли активные генерации
+      const hasActiveGenerations = updatedPlaceholders.some(p => p.status === 'generating');
+      
+      // Если нет активных генераций, сбрасываем флаг
+      if (!hasActiveGenerations) {
+        setIsGeneratingImages(false);
+      }
+      
+      return {
+        ...prev,
+        imagePlaceholders: updatedPlaceholders
+      };
+    });
   }, []);
+
+  /**
+   * Останавливает всю генерацию (текст + все изображения)
+   */
+  const abortAll = useCallback(() => {
+    // Останавливаем генерацию текста
+    abortTextGeneration();
+    
+    // Останавливаем все изображения
+    imageControllersRef.current.forEach(controller => {
+      controller.abort();
+    });
+    imageControllersRef.current.clear();
+    
+    // Обновляем статусы всех placeholder'ов
+    setArticleResult(prev => {
+      if (!prev) return null;
+      
+      const updatedPlaceholders = prev.imagePlaceholders.map(p =>
+        p.status === 'generating'
+          ? { ...p, status: 'pending' as const }
+          : p
+      );
+      
+      return {
+        ...prev,
+        imagePlaceholders: updatedPlaceholders,
+        status: prev.status === 'generating-text' ? 'error' : prev.status
+      };
+    });
+    
+    // Сбрасываем флаги генерации
+    setIsGeneratingText(false);
+    setIsGeneratingImages(false);
+  }, [abortTextGeneration]);
 
   /**
    * Сброс состояния
@@ -576,6 +817,7 @@ export function useSEOArticle() {
     regenerateImage,
     abortTextGeneration,
     abortImageGeneration,
+    abortAll,
     reset
   };
 }

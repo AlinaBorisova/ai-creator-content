@@ -905,7 +905,7 @@ RULES:
                 onGenerate={(promptText, htmlTemplate, imageResolution, modelVersion) => {
                   const topicMatch = promptText.match(/тема:\s*\[([^\]]+)\]/i);
                   const queryMatch = promptText.match(/запросу:\s*\[([^\]]+)\]/i);
-                  
+
                   seoArticle.generateArticleText(
                     promptText,
                     topicMatch ? topicMatch[1] : undefined,
@@ -918,6 +918,12 @@ RULES:
                 isStreaming={seoArticle.isGeneratingText || seoArticle.isGeneratingImages}
                 isParsingPrompts={false}
                 isGeneratingImages={seoArticle.isGeneratingImages}
+                onAbort={() => {
+                  // Останавливаем генерацию текста и всех изображений
+                  seoArticle.abortTextGeneration();
+                  // Используем функцию abortAll для остановки всего процесса генерации
+                  seoArticle.abortAll();
+                }}
               />
             ) : (mode !== 'videos' || videoState.generationMode === 'text-to-video') && (
               <PromptForm

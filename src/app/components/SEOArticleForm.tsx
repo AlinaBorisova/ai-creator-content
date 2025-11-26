@@ -16,7 +16,7 @@ export const IMAGE_RESOLUTIONS: ImageResolution[] = [
   { width: 1280, height: 700, label: 'Телеграм', aspectRatio: '16:9' },
   { width: 1080, height: 1080, label: 'Квадрат', aspectRatio: '1:1' },
   { width: 1100, height: 550, label: 'Статьи 1', aspectRatio: '16:9' },
-  { width: 735, height: 460, label: 'Статьи 2', aspectRatio: '4:3' }
+  { width: 800, height: 450, label: 'Статьи 2', aspectRatio: '16:9' }
 ];
 
 interface SEOArticleFormProps {
@@ -24,13 +24,15 @@ interface SEOArticleFormProps {
   isStreaming: boolean;
   isParsingPrompts: boolean;
   isGeneratingImages: boolean;
+  onAbort?: () => void;
 }
 
 export function SEOArticleForm({
   onGenerate,
   isStreaming,
   isParsingPrompts,
-  isGeneratingImages
+  isGeneratingImages,
+  onAbort
 }: SEOArticleFormProps) {
   const [prompt, setPrompt] = useState('');
   const [htmlTemplate, setHtmlTemplate] = useState('');
@@ -139,8 +141,8 @@ export function SEOArticleForm({
             onClick={() => setIsResolutionDropdownOpen(!isResolutionDropdownOpen)}
             disabled={isStreaming || isParsingPrompts || isGeneratingImages}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${isResolutionDropdownOpen
-                ? 'bg-(--btn-active-color) text-white'
-                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+              ? 'bg-(--btn-active-color) text-white'
+              : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
               }`}
           >
             {imageResolution.label} ({imageResolution.width}×{imageResolution.height})
@@ -197,8 +199,18 @@ export function SEOArticleForm({
         </div>
       </div>
 
-      {/* Кнопка отправки */}
-      <div className="flex justify-end">
+      {/* Кнопка отправки и остановки */}
+      <div className="flex justify-end gap-2">
+        {/* Кнопка остановки - показывается только во время генерации */}
+        {isStreaming && onAbort && (
+          <button
+            type="button"
+            onClick={onAbort}
+            className="bg-red-600 hover:bg-red-700 border border-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+          >
+            ⏹ Остановить генерацию
+          </button>
+        )}
         <button
           type="submit"
           className="bg-(--btn-active-color) disabled:bg-(--btn-color) disabled:cursor-not-allowed border border-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 disabled:scale-100 cursor-pointer"
