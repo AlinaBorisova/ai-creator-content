@@ -65,25 +65,25 @@ export default function HomePage() {
 
   if (user) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[#191919] text-white p-4">
-        <div className="bg-gray-800 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-(--background-color) text-white p-4">
+        <div className="border border-gray-700 p-8 rounded-3xl shadow-xl text-center max-w-md w-full">
           <h1 className="text-3xl font-bold mb-4">Welcome, {user.name || 'User'}!</h1>
           <p className="text-gray-400 mb-6">Choose service</p>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <Link href="/parser">
-              <div className="bg-gray-700 p-4 rounded-2xl text-center hover:bg-gray-600 transition-colors">
+              <div className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border)">
                 <h2 className="text-2xl font-bold">TG Parser</h2>
               </div>
             </Link>
             <Link href="/ai">
-              <div className="bg-gray-700 p-4 rounded-2xl text-center hover:bg-gray-600 transition-colors">
+              <div className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border)">
                 <h2 className="text-2xl font-bold">AI Text</h2>
               </div>
             </Link>
           </div>
           <button
             onClick={handleLogout}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors"
+            className="border border-red-400 hover:border-red-700 py-4 px-8 rounded-2xl transition-colors cursor-pointer"
           >
             Logout
           </button>

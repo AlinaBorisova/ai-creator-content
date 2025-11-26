@@ -471,14 +471,6 @@ export function SEOArticleResults({
                           Отменить
                         </button>
                       )}
-                      {/* {(placeholder.status === 'done' || placeholder.status === 'error') && (
-                        <button
-                          onClick={() => onRegenerateImage(placeholder.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors cursor-pointer"
-                        >
-                          {placeholder.status === 'error' ? 'Повторить' : 'Перегенерировать'}
-                        </button>
-                      )} */}
                     </div>
                   </div>
                 </div>
