@@ -174,7 +174,9 @@ export function insertImagesIntoHTML(
       })
       .join('\n     ');
 
-    const replacement = `<div class="${className}">\n     ${imageTags}\n</div>`;
+    // Сохраняем data-image-prompt и data-image-count для последующих обновлений
+    const dataAttributes = ` data-image-prompt="${placeholder.prompt.replace(/"/g, '&quot;')}" data-image-count="${placeholder.imageCount || 1}" data-placeholder-id="${placeholder.id}"`;
+    const replacement = `<div class="${className}"${dataAttributes}>\n     ${imageTags}\n</div>`;
 
     // Если есть все позиции, обновляем каждую позицию отдельно
     if (placeholder.allPositions && placeholder.allPositions.length > 0) {
@@ -247,7 +249,13 @@ export function updateImagePlaceholderInHTML(
     })
     .join('\n     ');
 
-  const replacement = `<div class="${className}">\n     ${imageTags}\n</div>`;
+  // Сохраняем data-image-prompt и data-image-count в replacement для последующих обновлений
+  const escapedPrompt = placeholder.prompt ? placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+  const dataAttributes = placeholder.prompt 
+    ? ` data-image-prompt="${placeholder.prompt.replace(/"/g, '&quot;')}" data-image-count="${placeholder.imageCount || 1}" data-placeholder-id="${placeholderId}"`
+    : ` data-placeholder-id="${placeholderId}"`;
+  
+  const replacement = `<div class="${className}"${dataAttributes}>\n     ${imageTags}\n</div>`;
 
   let result = htmlContent;
   let match;
@@ -259,15 +267,31 @@ export function updateImagePlaceholderInHTML(
     const sortedPositions = [...placeholder.allPositions].sort((a, b) => b - a);
 
     for (const pos of sortedPositions) {
-      // Сначала пытаемся найти div с атрибутами data-image-prompt
+      // Объявляем searchStart один раз для всех проверок в этой итерации
+      const searchStart = result.substring(pos);
+      
+      // Сначала пытаемся найти div с data-placeholder-id (самый надежный способ)
+      const idRegex = new RegExp(
+        `<div\\s+class="${escapedClassName}"[^>]*data-placeholder-id="${placeholderId}"[^>]*>([\\s\\S]*?)</div>`,
+        'g'
+      );
+
+      match = idRegex.exec(searchStart);
+      if (match) {
+        const beforePosition = result.substring(0, pos);
+        const afterPosition = result.substring(pos);
+        result = beforePosition + afterPosition.replace(match[0], replacement);
+        replacedCount++;
+        continue;
+      }
+
+      // Затем пытаемся найти div с атрибутами data-image-prompt (для первого раза)
       if (placeholder.prompt) {
-        const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const placeholderRegex = new RegExp(
           `<div\\s+class="${escapedClassName}"[^>]*data-image-prompt="${escapedPrompt}"[^>]*data-image-count="\\d+"[^>]*>([\\s\\S]*?)</div>`,
           'g'
         );
 
-        const searchStart = result.substring(pos);
         match = placeholderRegex.exec(searchStart);
         if (match) {
           const beforePosition = result.substring(0, pos);
@@ -278,8 +302,24 @@ export function updateImagePlaceholderInHTML(
         }
       }
 
-      // Если не нашли placeholder, ищем div по классу
-      const searchStart = result.substring(pos);
+      // Если не нашли по атрибутам, ищем div по классу, который содержит изображения
+      // Это fallback для случаев, когда атрибуты были удалены
+      const classWithImagesRegex = new RegExp(
+        `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?<img[^>]*>[\\s\\S]*?)</div>`,
+        'g'
+      );
+
+      match = classWithImagesRegex.exec(searchStart);
+      if (match) {
+        const actualMatch = match[0];
+        const beforePosition = result.substring(0, pos);
+        const afterPosition = result.substring(pos);
+        result = beforePosition + afterPosition.replace(actualMatch, replacement);
+        replacedCount++;
+        continue;
+      }
+
+      // Последний fallback: ищем div по классу (без проверки на изображения)
       const classRegex = new RegExp(
         `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?)</div>`,
         'g'
@@ -301,7 +341,17 @@ export function updateImagePlaceholderInHTML(
   }
 
   // Fallback: используем старую логику, если allPositions не задано
-  // Сначала пытаемся найти div с атрибутами data-image-prompt (если это еще placeholder)
+  // Сначала пытаемся найти div с data-placeholder-id
+  const idRegex = new RegExp(
+    `<div\\s+class="${escapedClassName}"[^>]*data-placeholder-id="${placeholderId}"[^>]*>([\\s\\S]*?)</div>`,
+    'g'
+  );
+  result = result.replace(idRegex, replacement);
+  if (result !== htmlContent) {
+    return result;
+  }
+
+  // Затем пытаемся найти div с атрибутами data-image-prompt (если это еще placeholder)
   if (placeholder.prompt) {
     const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const placeholderRegex = new RegExp(
@@ -319,7 +369,8 @@ export function updateImagePlaceholderInHTML(
   // Если не нашли placeholder, ищем div по классу, используя позицию для точности
   if (placeholder.position !== undefined) {
     // Ищем div с нужным классом, начиная с позиции placeholder'а
-    const searchStart = htmlContent.substring(placeholder.position);
+    // ИСПРАВЛЕНО: используем result вместо htmlContent
+    const searchStart = result.substring(placeholder.position);
     const classRegex = new RegExp(
       `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?)</div>`,
       'g'
@@ -327,10 +378,10 @@ export function updateImagePlaceholderInHTML(
 
     match = classRegex.exec(searchStart);
     if (match) {
-      // Заменяем в исходном HTML, учитывая смещение позиции
+      // Заменяем в обновленном HTML, учитывая смещение позиции
       const actualMatch = match[0];
-      const beforePosition = htmlContent.substring(0, placeholder.position);
-      const afterPosition = htmlContent.substring(placeholder.position);
+      const beforePosition = result.substring(0, placeholder.position);
+      const afterPosition = result.substring(placeholder.position);
       result = beforePosition + afterPosition.replace(actualMatch, replacement);
       return result;
     }
@@ -343,7 +394,7 @@ export function updateImagePlaceholderInHTML(
     'g'
   );
 
-  match = classWithImagesRegex.exec(htmlContent);
+  match = classWithImagesRegex.exec(result);
   if (match) {
     result = result.replace(match[0], replacement);
     return result;
