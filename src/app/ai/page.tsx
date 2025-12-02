@@ -277,6 +277,9 @@ RULES:
 
     const setStreamsFn = setStreams('research');
 
+    // Сначала полностью очищаем все потоки, затем инициализируем нужное количество
+    setStreamsFn(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
+
     // Инициализируем потоки для всех запросов
     setStreamsFn(prev => {
       const next = [...prev];
@@ -479,6 +482,9 @@ RULES:
 - Make it visually appealing with modern design
 - Use BEM methodology for class names`
       : prompt.value;
+
+    // Сначала полностью очищаем все потоки, затем инициализируем нужное количество
+    setStreams(mode)(Array.from({ length: PANELS_COUNT }, () => ({ text: '', status: 'idle' })));
 
     // Инициализируем потоки для всех запросов
     setStreams(mode)(prev => {
