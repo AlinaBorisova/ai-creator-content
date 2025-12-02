@@ -1,0 +1,131 @@
+* Unmerged path src/utils/seoArticleUtils.ts
+[1mdiff --git a/src/utils/seoArticleUtils.ts b/src/utils/seoArticleUtils.ts[m
+[1mindex ff73d7f..a39a9d2 100644[m
+[1m--- a/src/utils/seoArticleUtils.ts[m
+[1m+++ b/src/utils/seoArticleUtils.ts[m
+[36m@@ -174,7 +174,9 @@[m [mexport function insertImagesIntoHTML([m
+       })[m
+       .join('\n     ');[m
+ [m
+[31m-    const replacement = `<div class="${className}">\n     ${imageTags}\n</div>`;[m
+[32m+[m[32m    // Сохраняем data-image-prompt и data-image-count для последующих обновлений[m
+[32m+[m[32m    const dataAttributes = ` data-image-prompt="${placeholder.prompt.replace(/"/g, '&quot;')}" data-image-count="${placeholder.imageCount || 1}" data-placeholder-id="${placeholder.id}"`;[m
+[32m+[m[32m    const replacement = `<div class="${className}"${dataAttributes}>\n     ${imageTags}\n</div>`;[m
+ [m
+     // Если есть все позиции, обновляем каждую позицию отдельно[m
+     if (placeholder.allPositions && placeholder.allPositions.length > 0) {[m
+[36m@@ -247,7 +249,13 @@[m [mexport function updateImagePlaceholderInHTML([m
+     })[m
+     .join('\n     ');[m
+ [m
+[31m-  const replacement = `<div class="${className}">\n     ${imageTags}\n</div>`;[m
+[32m+[m[32m  // Сохраняем data-image-prompt и data-image-count в replacement для последующих обновлений[m
+[32m+[m[32m  const escapedPrompt = placeholder.prompt ? placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';[m
+[32m+[m[32m  const dataAttributes = placeholder.prompt[m[41m [m
+[32m+[m[32m    ? ` data-image-prompt="${placeholder.prompt.replace(/"/g, '&quot;')}" data-image-count="${placeholder.imageCount || 1}" data-placeholder-id="${placeholderId}"`[m
+[32m+[m[32m    : ` data-placeholder-id="${placeholderId}"`;[m
+[32m+[m[41m  [m
+[32m+[m[32m  const replacement = `<div class="${className}"${dataAttributes}>\n     ${imageTags}\n</div>`;[m
+ [m
+   let result = htmlContent;[m
+   let match;[m
+[36m@@ -259,15 +267,31 @@[m [mexport function updateImagePlaceholderInHTML([m
+     const sortedPositions = [...placeholder.allPositions].sort((a, b) => b - a);[m
+ [m
+     for (const pos of sortedPositions) {[m
+[31m-      // Сначала пытаемся найти div с атрибутами data-image-prompt[m
+[32m+[m[32m      // Объявляем searchStart один раз для всех проверок в этой итерации[m
+[32m+[m[32m      const searchStart = result.substring(pos);[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Сначала пытаемся найти div с data-placeholder-id (самый надежный способ)[m
+[32m+[m[32m      const idRegex = new RegExp([m
+[32m+[m[32m        `<div\\s+class="${escapedClassName}"[^>]*data-placeholder-id="${placeholderId}"[^>]*>([\\s\\S]*?)</div>`,[m
+[32m+[m[32m        'g'[m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      match = idRegex.exec(searchStart);[m
+[32m+[m[32m      if (match) {[m
+[32m+[m[32m        const beforePosition = result.substring(0, pos);[m
+[32m+[m[32m        const afterPosition = result.substring(pos);[m
+[32m+[m[32m        result = beforePosition + afterPosition.replace(match[0], replacement);[m
+[32m+[m[32m        replacedCount++;[m
+[32m+[m[32m        continue;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Затем пытаемся найти div с атрибутами data-image-prompt (для первого раза)[m
+       if (placeholder.prompt) {[m
+[31m-        const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');[m
+         const placeholderRegex = new RegExp([m
+           `<div\\s+class="${escapedClassName}"[^>]*data-image-prompt="${escapedPrompt}"[^>]*data-image-count="\\d+"[^>]*>([\\s\\S]*?)</div>`,[m
+           'g'[m
+         );[m
+ [m
+[31m-        const searchStart = result.substring(pos);[m
+         match = placeholderRegex.exec(searchStart);[m
+         if (match) {[m
+           const beforePosition = result.substring(0, pos);[m
+[36m@@ -278,8 +302,24 @@[m [mexport function updateImagePlaceholderInHTML([m
+         }[m
+       }[m
+ [m
+[31m-      // Если не нашли placeholder, ищем div по классу[m
+[31m-      const searchStart = result.substring(pos);[m
+[32m+[m[32m      // Если не нашли по атрибутам, ищем div по классу, который содержит изображения[m
+[32m+[m[32m      // Это fallback для случаев, когда атрибуты были удалены[m
+[32m+[m[32m      const classWithImagesRegex = new RegExp([m
+[32m+[m[32m        `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?<img[^>]*>[\\s\\S]*?)</div>`,[m
+[32m+[m[32m        'g'[m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      match = classWithImagesRegex.exec(searchStart);[m
+[32m+[m[32m      if (match) {[m
+[32m+[m[32m        const actualMatch = match[0];[m
+[32m+[m[32m        const beforePosition = result.substring(0, pos);[m
+[32m+[m[32m        const afterPosition = result.substring(pos);[m
+[32m+[m[32m        result = beforePosition + afterPosition.replace(actualMatch, replacement);[m
+[32m+[m[32m        replacedCount++;[m
+[32m+[m[32m        continue;[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      // Последний fallback: ищем div по классу (без проверки на изображения)[m
+       const classRegex = new RegExp([m
+         `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?)</div>`,[m
+         'g'[m
+[36m@@ -301,7 +341,17 @@[m [mexport function updateImagePlaceholderInHTML([m
+   }[m
+ [m
+   // Fallback: используем старую логику, если allPositions не задано[m
+[31m-  // Сначала пытаемся найти div с атрибутами data-image-prompt (если это еще placeholder)[m
+[32m+[m[32m  // Сначала пытаемся найти div с data-placeholder-id[m
+[32m+[m[32m  const idRegex = new RegExp([m
+[32m+[m[32m    `<div\\s+class="${escapedClassName}"[^>]*data-placeholder-id="${placeholderId}"[^>]*>([\\s\\S]*?)</div>`,[m
+[32m+[m[32m    'g'[m
+[32m+[m[32m  );[m
+[32m+[m[32m  result = result.replace(idRegex, replacement);[m
+[32m+[m[32m  if (result !== htmlContent) {[m
+[32m+[m[32m    return result;[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  // Затем пытаемся найти div с атрибутами data-image-prompt (если это еще placeholder)[m
+   if (placeholder.prompt) {[m
+     const escapedPrompt = placeholder.prompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');[m
+     const placeholderRegex = new RegExp([m
+[36m@@ -319,7 +369,8 @@[m [mexport function updateImagePlaceholderInHTML([m
+   // Если не нашли placeholder, ищем div по классу, используя позицию для точности[m
+   if (placeholder.position !== undefined) {[m
+     // Ищем div с нужным классом, начиная с позиции placeholder'а[m
+[31m-    const searchStart = htmlContent.substring(placeholder.position);[m
+[32m+[m[32m    // ИСПРАВЛЕНО: используем result вместо htmlContent[m
+[32m+[m[32m    const searchStart = result.substring(placeholder.position);[m
+     const classRegex = new RegExp([m
+       `<div\\s+class="${escapedClassName}"[^>]*>([\\s\\S]*?)</div>`,[m
+       'g'[m
+[36m@@ -327,10 +378,10 @@[m [mexport function updateImagePlaceholderInHTML([m
+ [m
+     match = classRegex.exec(searchStart);[m
+     if (match) {[m
+[31m-      // Заменяем в исходном HTML, учитывая смещение позиции[m
+[32m+[m[32m      // Заменяем в обновленном HTML, учитывая смещение позиции[m
+       const actualMatch = match[0];[m
+[31m-      const beforePosition = htmlContent.substring(0, placeholder.position);[m
+[31m-      const afterPosi
