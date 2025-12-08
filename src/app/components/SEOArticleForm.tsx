@@ -206,7 +206,7 @@ export function SEOArticleForm({
           <button
             type="button"
             onClick={onAbort}
-            className="bg-red-600 hover:bg-red-700 border border-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+            className="border border-red-400 hover:border-red-700 rounded-lg transition-colors cursor-pointer text-white font-bold py-3 px-6"
           >
             ⏹ Остановить генерацию
           </button>

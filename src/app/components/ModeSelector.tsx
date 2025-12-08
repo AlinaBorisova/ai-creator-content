@@ -68,7 +68,7 @@ export function ModeSelector({
           <ImageIcon className="w-4 h-4" /> {selectedImageModel || 'Изображения'}
         </button>
         {isImagesDropdownOpen && (
-          <div className="absolute top-full left-0 mt-1 bg-(--btn-color) rounded-lg shadow-lg z-50 min-w-[120px]">
+          <div className="absolute w-full top-full left-0 mt-1 bg-(--btn-color) rounded-lg shadow-lg z-50 min-w-[120px]">
             {imageModels.map((model) => (
               <button
                 key={model}
