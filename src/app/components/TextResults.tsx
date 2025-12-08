@@ -13,6 +13,7 @@ interface TextResultsProps {
   onAbort: (index: number) => void;
   onToggleCodePanel: (index: number) => void;
   onAdjustIframeHeight: (iframe: HTMLIFrameElement, index: number) => void;
+  onRetry?: (index: number) => void;
 }
 
 export function TextResults({
@@ -26,7 +27,8 @@ export function TextResults({
   onCopyToClipboard,
   onAbort,
   onToggleCodePanel,
-  onAdjustIframeHeight
+  onAdjustIframeHeight,
+  onRetry,
 }: TextResultsProps) {
   return (
     <>
@@ -45,6 +47,7 @@ export function TextResults({
           onAbort={onAbort}
           onToggleCodePanel={onToggleCodePanel}
           onAdjustIframeHeight={onAdjustIframeHeight}
+          onRetry={onRetry}
         />
       ))}
     </>
