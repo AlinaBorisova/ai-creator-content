@@ -30,8 +30,8 @@ export async function streamTextViaGeminiDirect(
 
     // Создаем AbortController с таймаутом
     const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => timeoutController.abort(), 120000); // 120 секунд таймаут
-
+    const timeoutMs = 180000; // 180 секунд (3 минуты)
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
     // Объединяем сигналы: пользовательский abort и таймаут
     let combinedSignal: AbortSignal;
     if (signal) {
@@ -94,8 +94,68 @@ export async function streamTextViaGeminiDirect(
 
       if (data.candidates && data.candidates.length > 0) {
         const candidate = data.candidates[0];
-        if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
-          fullText = candidate.content.parts[0].text || '';
+        
+        // Детальное логирование структуры ответа
+        console.log('🔍 Candidate structure:', {
+          hasContent: !!candidate.content,
+          contentType: typeof candidate.content,
+          contentKeys: candidate.content ? Object.keys(candidate.content) : [],
+          hasParts: !!(candidate.content && candidate.content.parts),
+          partsLength: candidate.content?.parts?.length || 0,
+          finishReason: candidate.finishReason,
+          finishMessage: candidate.finishMessage,
+          safetyRatings: candidate.safetyRatings
+        });
+
+        if (candidate.content) {
+          // Проверяем разные возможные структуры ответа
+          if (candidate.content.parts && candidate.content.parts.length > 0) {
+            fullText = candidate.content.parts[0].text || '';
+          } else if (candidate.content.text) {
+            // Альтернативная структура, если текст напрямую в content
+            fullText = candidate.content.text;
+          } else if (typeof candidate.content === 'string') {
+            // Если content - это строка
+            fullText = candidate.content;
+          } else {
+            // Если content пустой объект, проверяем причину
+            console.warn('⚠️ Content is empty object. Checking reasons...');
+          }
+        }
+
+        // Проверяем finishReason на наличие блокировок
+        if (candidate.finishReason) {
+          if (candidate.finishReason !== 'STOP') {
+            console.warn('⚠️ Finish reason:', candidate.finishReason, candidate.finishMessage || '');
+            if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION') {
+              throw new Error(`Content blocked: ${candidate.finishReason} - ${candidate.finishMessage || 'No message'}`);
+            }
+          }
+        }
+
+        // Проверяем safety ratings
+        if (candidate.safetyRatings && candidate.safetyRatings.length > 0) {
+          const blockedRatings = candidate.safetyRatings.filter(
+            (rating: { blocked: boolean; category?: string; probability?: string }) => rating.blocked
+          );
+          if (blockedRatings.length > 0) {
+            const blockedCategories = blockedRatings.map((r: { category?: string }) => r.category).filter(Boolean);
+            console.warn('⚠️ Content blocked by safety filters:', blockedCategories);
+            throw new Error(`Content blocked by safety filters: ${blockedCategories.join(', ')}`);
+          }
+        }
+
+        // Если content пустой, но finishReason STOP - это баг API
+        if (!fullText && candidate.finishReason === 'STOP') {
+          if (candidate.content && Object.keys(candidate.content).length === 0) {
+            console.error('⚠️ Empty content object with STOP finishReason. This might be a Gemini API issue.');
+            console.error('Full candidate:', JSON.stringify(candidate, null, 2));
+            throw new Error('Empty content received from Gemini API despite STOP finishReason. Please try again.');
+          } else if (!candidate.content) {
+            console.error('⚠️ No content field with STOP finishReason.');
+            console.error('Full candidate:', JSON.stringify(candidate, null, 2));
+            throw new Error('No content field in Gemini API response despite STOP finishReason. Please try again.');
+          }
         }
       }
 
@@ -103,7 +163,7 @@ export async function streamTextViaGeminiDirect(
       console.log('📝 First 100 chars:', fullText.slice(0, 100));
 
       if (!fullText) {
-        console.error('❌ No text in response:', data);
+        console.error('❌ No text in response. Full response:', JSON.stringify(data, null, 2));
         throw new Error('No text generated');
       }
 
