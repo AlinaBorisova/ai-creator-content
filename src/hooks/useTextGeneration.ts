@@ -60,9 +60,18 @@ RULES:
   }, []);
 
   const formatResearchPrompt = useCallback((prompt: string) => {
-    return `${prompt}
+    return `You are a research assistant. Use Google Search to find the most current and accurate information about the following topic/question, then create comprehensive content based on your research findings.
 
-    STRICT FORMAT REQUIRED - Output ONLY this structure:
+RESEARCH TOPIC/QUESTION:
+${prompt}
+
+IMPORTANT INSTRUCTIONS:
+1. Use Google Search to find relevant, up-to-date information about the topic
+2. Search for multiple aspects and perspectives on the topic
+3. Synthesize the information from your search results
+4. Create comprehensive, well-structured content based on your research
+
+STRICT FORMAT REQUIRED - Output ONLY this structure:
 
 \`\`\`html
 <!DOCTYPE html>
@@ -88,21 +97,22 @@ RULES:
 - NO explanations or text outside the code block
 - Make it visually appealing with modern design
 - Use BEM methodology for class names
-- Use information from your research to create accurate and up-to-date content`;
+- Use information from your research to create accurate and up-to-date content
+- Include citations and references where appropriate`;
   }, []);
 
   const startStream = useCallback((index: number, promptText: string, isResearch: boolean = false) => {
     // Сохраняем ОРИГИНАЛЬНЫЙ промпт для возможного retry (до форматирования)
     promptsRef.current[index] = { prompt: promptText, isResearch };
     console.log(`💾 Saved prompt for index ${index}:`, promptText.slice(0, 50), 'isResearch:', isResearch);
-    
+
     const controller = new AbortController();
     controllersRef.current[index] = controller;
 
     const apiEndpoint = isResearch ? '/api/ai/gemini/research' : '/api/ai/gemini/stream';
-    const finalPrompt = isResearch 
+    const finalPrompt = isResearch
       ? formatResearchPrompt(promptText)
-      : mode === 'html' 
+      : mode === 'html'
         ? formatHtmlPrompt(promptText)
         : promptText;
 
@@ -179,9 +189,9 @@ RULES:
       })
       .catch(error => {
         // Проверяем, является ли это таймаутом (из gemini.ts)
-        const isTimeout = error instanceof Error && 
+        const isTimeout = error instanceof Error &&
           (error.message.includes('timed out') || error.message === 'Request was aborted or timed out');
-        
+
         if (isTimeout) {
           // Таймаут - это ошибка, показываем кнопку retry
           console.error(`${isResearch ? 'Research' : 'Stream'} ${index} timed out after 120 seconds`);
@@ -283,10 +293,10 @@ RULES:
     const savedPrompt = promptsRef.current[index];
     if (!savedPrompt || !savedPrompt.prompt) {
       console.warn('No saved prompt for retry at index', index);
-      console.warn('Available prompts:', promptsRef.current.map((p, i) => ({ 
-        index: i, 
-        hasPrompt: !!p.prompt, 
-        prompt: p.prompt ? p.prompt.slice(0, 50) : 'empty' 
+      console.warn('Available prompts:', promptsRef.current.map((p, i) => ({
+        index: i,
+        hasPrompt: !!p.prompt,
+        prompt: p.prompt ? p.prompt.slice(0, 50) : 'empty'
       })));
       return;
     }
@@ -299,8 +309,8 @@ RULES:
     setStreamsFn(prev => {
       const next = [...prev];
       if (next[index]) {
-        next[index] = { 
-          text: '', 
+        next[index] = {
+          text: '',
           status: 'loading',
           error: undefined
         };
