@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
@@ -35,7 +36,9 @@ export default function HomePage() {
         localStorage.setItem('user', JSON.stringify(data.user));
 
         // Сохранить токен в cookies для middleware
-        document.cookie = `authToken=${token}; path=/; max-age=31536000; secure; samesite=strict`;
+        // Убираем secure для localhost, добавляем для production
+        const isSecure = process.env.NODE_ENV === 'production';
+        document.cookie = `authToken=${token}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=strict`;
       } else {
         setError(data.error || 'Invalid token');
       }
@@ -52,6 +55,8 @@ export default function HomePage() {
     setToken('');
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    // Удаляем cookie
+    document.cookie = 'authToken=; path=/; max-age=0';
   };
 
   useEffect(() => {
@@ -70,15 +75,17 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold mb-4">Welcome, {user.name || 'User'}!</h1>
           <p className="text-gray-400 mb-6">Choose service</p>
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <Link href="/parser">
-              <div className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border)">
-                <h2 className="text-2xl font-bold">TG Parser</h2>
-              </div>
+            <Link 
+              href="/parser"
+              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer block"
+            >
+              <h2 className="text-2xl font-bold">TG Parser</h2>
             </Link>
-            <Link href="/ai">
-              <div className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border)">
-                <h2 className="text-2xl font-bold">AI Text</h2>
-              </div>
+            <Link 
+              href="/ai"
+              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer block"
+            >
+              <h2 className="text-2xl font-bold">AI Text</h2>
             </Link>
           </div>
           <button
