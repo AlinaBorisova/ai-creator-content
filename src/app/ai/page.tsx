@@ -57,7 +57,7 @@ export default function AIPage() {
   const streams = getStreams(mode);
 
   // Список нейросетей для генерации изображений
-  const imageModels = ['Imagen 4'];
+  const imageModels = ['Imagen 4', 'Nano Banana PRO'];
 
   // Хук для управления высотой iframe
   const { iframeHeights, adjustIframeHeight } = useIframeHeight(mode, streams);
@@ -240,6 +240,7 @@ export default function AIPage() {
         imageState.aspectRatio,
         imageState.imagenModel,
         imageState.imageSize,
+        imageState.geminiImageResolution,
         prompt.setError
       );
       return;
@@ -368,9 +369,12 @@ export default function AIPage() {
                 aspectRatio={imageState.aspectRatio}
                 imagenModel={imageState.imagenModel}
                 imageSize={imageState.imageSize}
+                geminiImageResolution={imageState.geminiImageResolution}
+                selectedImageModel={selectedImageModel}
                 onAspectRatioChange={imageState.setAspectRatio}
                 onImagenModelChange={imageState.setImagenModel}
                 onImageSizeChange={imageState.setImageSize}
+                onGeminiImageResolutionChange={imageState.setGeminiImageResolution}
               />
             )}
 

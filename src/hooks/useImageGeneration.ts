@@ -75,14 +75,14 @@ export function useImageGeneration() {
             // Если не удалось распарсить, используем дефолтное сообщение
           }
         }
-        
+
         // Улучшаем сообщение для ошибок квоты
         if (errorMessage.includes('quota') || errorMessage.includes('Quota exceeded')) {
           errorMessage = 'Превышен дневной лимит запросов к Imagen API. Лимит: 70 запросов в день. Попробуйте завтра или используйте другую модель (Flux, Banana, Ideogram).';
         } else if (errorMessage.includes('location is not supported')) {
           errorMessage = 'Imagen API недоступен в вашем регионе. Используйте другую модель (Flux, Banana, Ideogram).';
         }
-        
+
         throw new Error(errorMessage);
       }
 
@@ -108,6 +108,7 @@ export function useImageGeneration() {
     aspectRatio: string,
     imagenModel: string,
     imageSize: string,
+    geminiImageResolution: '1K' | '2K' | '4K',
     onError: (error: string) => void
   ) => {
     if (!promptValue.trim()) return;
@@ -138,6 +139,7 @@ export function useImageGeneration() {
 
     // Проверяем, выбрана ли модель Imagen 4
     const isImagen4 = selectedImageModel === 'Imagen 4';
+    const isNanoBananaPro = selectedImageModel === 'Nano Banana PRO';
 
     // Инициализируем контроллеры для каждого промпта
     controllersRef.current = prompts.map(() => new AbortController());
@@ -204,12 +206,121 @@ export function useImageGeneration() {
             } else {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
               console.error(`Error generating images for prompt ${i + 1}:`, error);
-              
+
               // Показываем ошибку пользователю через onError callback (только для первого промпта)
               if (i === 0) {
                 onError(errorMessage);
               }
-              
+
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'error',
+                error: errorMessage,
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            }
+          }
+
+          setImageResults([...results]);
+        }
+      } catch (error) {
+        console.error('Error in image generation process:', error);
+      } finally {
+        setIsGeneratingImages(false);
+        setIsParsingPrompts(false);
+        controllersRef.current = [];
+      }
+    } else if (isNanoBananaPro) {
+      setIsGeneratingImages(true);
+
+      try {
+        const results: ImageGenerationResult[] = [];
+
+        for (let i = 0; i < prompts.length; i++) {
+          const promptText = prompts[i];
+          const controller = controllersRef.current[i];
+
+          if (!controller || controller.signal.aborted) {
+            results.push({
+              prompt: promptText,
+              images: [],
+              status: 'idle',
+              translatedPrompt: undefined,
+              hasSlavicPrompts: false,
+              wasTranslated: false
+            });
+            setImageResults([...results]);
+            continue;
+          }
+
+          console.log(`🎨 Generating images with Nano Banana PRO for prompt ${i + 1}:`, promptText);
+
+          try {
+            const response = await fetch('/api/ai/gemini/image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt: promptText,
+                aspectRatio: aspectRatio,
+                resolution: geminiImageResolution
+              }),
+              signal: controller.signal
+            });
+
+            if (!response.ok) {
+              let errorMessage = 'Failed to generate images';
+              try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+              } catch {
+                // Если не удалось распарсить, используем дефолтное сообщение
+              }
+              throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+
+            if (controller.signal.aborted) {
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'idle',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            } else {
+              results.push({
+                prompt: promptText,
+                images: data.images || [],
+                status: 'done',
+                translatedPrompt: data.translation?.translated || promptText,
+                hasSlavicPrompts: data.translation?.hasSlavicPrompts || false,
+                wasTranslated: data.translation?.wasTranslated || false
+              });
+            }
+          } catch (error) {
+            if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+              console.log(`Image generation ${i} aborted by user`);
+              results.push({
+                prompt: promptText,
+                images: [],
+                status: 'idle',
+                translatedPrompt: undefined,
+                hasSlavicPrompts: false,
+                wasTranslated: false
+              });
+            } else {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              console.error(`Error generating images for prompt ${i + 1}:`, error);
+
+              if (i === 0) {
+                onError(errorMessage);
+              }
+
               results.push({
                 prompt: promptText,
                 images: [],

@@ -5,11 +5,12 @@ export function useImageState() {
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [imagenModel, setImagenModel] = useState('imagen-4.0-generate-001');
   const [imageSize, setImageSize] = useState('1K');
+  const [geminiImageResolution, setGeminiImageResolution] = useState<'1K' | '2K' | '4K'>('1K');
 
   // useEffect для автоматического сброса размера при смене модели
   useEffect(() => {
     if (imagenModel === 'imagen-4.0-fast-generate-001') {
-      setImageSize('1K'); // Автоматически сбрасываем на 1K для Fast модели
+      setImageSize('1K');
     }
   }, [imagenModel]);
 
@@ -21,6 +22,8 @@ export function useImageState() {
     imagenModel,
     setImagenModel,
     imageSize,
-    setImageSize
+    setImageSize,
+    geminiImageResolution,
+    setGeminiImageResolution
   };
 }

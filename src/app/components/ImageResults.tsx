@@ -113,7 +113,7 @@ export function ImageResults({
                   </div>
                 ))}
               </>
-            ) : selectedImageModel === 'Imagen 4' ? (
+            ) : selectedImageModel === 'Imagen 4' || selectedImageModel === 'Nano Banana PRO' ? (
               <>
                 {result.images.slice(0, imageCount).map((image, imgIndex) => (
                   <div key={imgIndex} className="flex-1 bg-(--background-color) border border-gray-700 rounded-lg p-2 flex flex-col min-h-[200px]">

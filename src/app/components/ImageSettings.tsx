@@ -2,37 +2,50 @@ interface ImageSettingsProps {
   aspectRatio: string;
   imagenModel: string;
   imageSize: string;
+  geminiImageResolution?: '1K' | '2K' | '4K';
+  selectedImageModel?: string | null;
   onAspectRatioChange: (ratio: string) => void;
   onImagenModelChange: (model: string) => void;
   onImageSizeChange: (size: string) => void;
+  onGeminiImageResolutionChange?: (resolution: '1K' | '2K' | '4K') => void;
 }
 
 export function ImageSettings({
   aspectRatio,
   imagenModel,
   imageSize,
+  geminiImageResolution = '1K',
+  selectedImageModel,
   onAspectRatioChange,
   onImagenModelChange,
-  onImageSizeChange
+  onImageSizeChange,
+  onGeminiImageResolutionChange
 }: ImageSettingsProps) {
+  const isNanoBananaPro = selectedImageModel === 'Nano Banana PRO';
+
   return (
     <>
       {/* Выбор соотношения сторон */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Соотношение сторон:</span>
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <span className="text-sm text-gray-400 self-center mr-2">Соотношение сторон:</span>
         {[
           { value: '1:1', label: '1:1 (Квадрат)' },
+          { value: '2:3', label: '2:3 (Портрет)' },
+          { value: '3:2', label: '3:2 (Альбом)' },
           { value: '3:4', label: '3:4 (Портрет)' },
           { value: '4:3', label: '4:3 (Альбом)' },
+          { value: '4:5', label: '4:5 (Портрет)' },
+          { value: '5:4', label: '5:4 (Альбом)' },
           { value: '9:16', label: '9:16 (Вертикальный)' },
-          { value: '16:9', label: '16:9 (Горизонтальный)' }
+          { value: '16:9', label: '16:9 (Горизонтальный)' },
+          { value: '21:9', label: '21:9 (Широкий)' }
         ].map((ratio) => (
           <button
             key={ratio.value}
             onClick={() => onAspectRatioChange(ratio.value)}
             className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${aspectRatio === ratio.value
-                ? 'bg-(--btn-active-color) text-white'
-                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+              ? 'bg-(--btn-active-color) text-white'
+              : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
               }`}
             title={ratio.label}
           >
@@ -41,47 +54,76 @@ export function ImageSettings({
         ))}
       </div>
 
-      {/* Выбор модели Imagen */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Модель Imagen:</span>
-        {[
-          { value: 'imagen-4.0-generate-001', label: 'Imagen 4 Standard' },
-          { value: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4 Ultra' },
-          { value: 'imagen-4.0-fast-generate-001', label: 'Imagen 4 Fast' }
-        ].map((model) => (
-          <button
-            key={model.value}
-            onClick={() => onImagenModelChange(model.value)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imagenModel === model.value
-                ? 'bg-(--btn-active-color) text-white'
-                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
-              }`}
-            title={model.label}
-          >
-            {model.value === 'imagen-4.0-generate-001' ? 'Standard' :
-              model.value === 'imagen-4.0-ultra-generate-001' ? 'Ultra' : 'Fast'}
-          </button>
-        ))}
-      </div>
-
-      {/* Выбор размера изображения - только для Standard и Ultra */}
-      {(imagenModel === 'imagen-4.0-generate-001' || imagenModel === 'imagen-4.0-ultra-generate-001') && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Размер изображения:</span>
-          {[
-            { value: '1K', label: '1K (1024x1024)' },
-            { value: '2K', label: '2K (2048x2048)' }
-          ].map((size) => (
-            <button
-              key={size.value}
-              onClick={() => onImageSizeChange(size.value)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageSize === size.value
+      {/* Настройки для Imagen 4 */}
+      {selectedImageModel === 'Imagen 4' && (
+        <>
+          {/* Выбор модели Imagen */}
+          <div className="flex gap-2 mb-4">
+            <span className="text-sm text-gray-400 self-center mr-2">Модель Imagen:</span>
+            {[
+              { value: 'imagen-4.0-generate-001', label: 'Imagen 4 Standard' },
+              { value: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4 Ultra' },
+              { value: 'imagen-4.0-fast-generate-001', label: 'Imagen 4 Fast' }
+            ].map((model) => (
+              <button
+                key={model.value}
+                onClick={() => onImagenModelChange(model.value)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imagenModel === model.value
                   ? 'bg-(--btn-active-color) text-white'
                   : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+                  }`}
+                title={model.label}
+              >
+                {model.value === 'imagen-4.0-generate-001' ? 'Standard' :
+                  model.value === 'imagen-4.0-ultra-generate-001' ? 'Ultra' : 'Fast'}
+              </button>
+            ))}
+          </div>
+
+          {/* Выбор размера изображения - только для Standard и Ultra */}
+          {(imagenModel === 'imagen-4.0-generate-001' || imagenModel === 'imagen-4.0-ultra-generate-001') && (
+            <div className="flex gap-2 mb-4">
+              <span className="text-sm text-gray-400 self-center mr-2">Размер изображения:</span>
+              {[
+                { value: '1K', label: '1K (1024x1024)' },
+                { value: '2K', label: '2K (2048x2048)' }
+              ].map((size) => (
+                <button
+                  key={size.value}
+                  onClick={() => onImageSizeChange(size.value)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${imageSize === size.value
+                    ? 'bg-(--btn-active-color) text-white'
+                    : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+                    }`}
+                  title={size.label}
+                >
+                  {size.value}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Настройки для Nano Banana PRO */}
+      {isNanoBananaPro && onGeminiImageResolutionChange && (
+        <div className="flex gap-2 mb-4">
+          <span className="text-sm text-gray-400 self-center mr-2">Разрешение:</span>
+          {[
+            { value: '1K' as const, label: '1K (1210 токенов)' },
+            { value: '2K' as const, label: '2K (1210 токенов)' },
+            { value: '4K' as const, label: '4K (2000 токенов)' }
+          ].map((res) => (
+            <button
+              key={res.value}
+              onClick={() => onGeminiImageResolutionChange!(res.value)}
+              className={`px-3 py-2 rounded-lg text-sm font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${geminiImageResolution === res.value
+                ? 'bg-(--btn-active-color) text-white'
+                : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
                 }`}
-              title={size.label}
+              title={res.label}
             >
-              {size.value}
+              {res.value}
             </button>
           ))}
         </div>
