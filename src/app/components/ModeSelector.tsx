@@ -20,7 +20,7 @@ export function ModeSelector({
   imageModels
 }: ModeSelectorProps) {
   return (
-    <div className="flex gap-2 mb-4">
+    <div className="flex flex-wrap gap-2 mb-4">
       <button
         onClick={() => onModeChange('html')}
         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${mode === 'html'

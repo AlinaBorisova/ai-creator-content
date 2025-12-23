@@ -18,10 +18,10 @@ export function RequestCountSelector({
   onVideoCountChange
 }: RequestCountSelectorProps) {
   return (
-    <div className="flex gap-2 mb-4">
+    <div className="flex flex-wrap gap-2 mb-4">
       {mode === 'images' ? (
         <>
-          <span className="text-sm text-gray-400 self-center mr-2">Изображений на промпт:</span>
+          <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Изображений на промпт:</span>
           {[1, 2, 3, 4].map((count) => (
             <button
               key={count}
@@ -37,7 +37,7 @@ export function RequestCountSelector({
         </>
         ) : mode === 'videos' ? (
           <>
-            <span className="text-sm text-gray-400 self-center mr-2">Видео на промпт:</span>
+            <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Видео на промпт:</span>
             {[1, 2, 3, 4].map((count) => (
               <button
                 key={count}
@@ -53,7 +53,7 @@ export function RequestCountSelector({
           </>
       ) : (
         <>
-          <span className="text-sm text-gray-400 self-center mr-2">Количество ответов:</span>
+          <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Количество ответов:</span>
           {[1, 2, 3, 4, 5].map((count) => (
             <button
               key={count}

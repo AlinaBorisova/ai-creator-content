@@ -324,8 +324,8 @@ export default function AIPage() {
 
   return (
     <main className="min-h-screen">
-      <div className="w-full mx-auto w-full py-6 sm:py-10 px-4">
-        <div className="flex gap-6">
+      <div className="w-full mx-auto w-full py-6 sm:py-10 px-4 md:px-6">
+        <div className="flex gap-2 sm:gap-4 md:gap-6">
           <HistoryButton
             isOpen={isHistoryOpen}
             onToggle={() => setIsHistoryOpen(!isHistoryOpen)}

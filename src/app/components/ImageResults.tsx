@@ -22,9 +22,9 @@ export function ImageResults({
   return (
     <div className="space-y-6">
       {imageResults.map((result: ImageGenerationResult, index: number) => (
-        <div key={index} className="flex gap-4">
-          {/* Блок с промптом - 30% ширины */}
-          <div className="w-[30%] bg-(--background-color) border border-gray-700 rounded-lg p-4">
+        <div key={index} className="flex flex-col md:flex-row gap-4">
+          {/* Блок с промптом - адаптивная ширина */}
+          <div className="w-full md:w-[30%] bg-(--background-color) border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium text-gray-300">Промпт #{index + 1}</h4>
               <div className="flex gap-2">
@@ -87,7 +87,7 @@ export function ImageResults({
           </div>
 
           {/* Блоки с изображениями - 70% ширины */}
-          <div className="w-[70%] flex gap-4">
+          <div className="w-full md:w-[70%] flex flex-col md:flex-row gap-4">
             {result.status === 'loading' ? (
               <>
                 {Array.from({ length: imageCount }, (_, imgIndex) => (

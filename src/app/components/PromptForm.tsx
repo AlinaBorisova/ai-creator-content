@@ -26,8 +26,8 @@ export function PromptForm({
   isGeneratingImages
 }: PromptFormProps) {
   return (
-    <form onSubmit={onSubmit} className="flex flex-col items-center sm:flex-row gap-3 sm:gap-4">
-      <div className="flex-1">
+    <form onSubmit={onSubmit} className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 w-full">
+      <div className="flex-1 w-full">
         <label className="sr-only" htmlFor="prompt">Prompt</label>
         <textarea
           id="prompt"
@@ -58,7 +58,7 @@ export function PromptForm({
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 sm:gap-3 sm:w-auto">
+      <div className="flex flex-col gap-2 sm:gap-3 sm:w-auto w-full sm:w-auto">
         <button
           type="submit"
           className="bg-(--btn-active-color) disabled:bg-(--btn-color) disabled:cursor-not-allowed border border-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 hover:scale-105 disabled:scale-100 cursor-pointer w-full sm:w-auto"

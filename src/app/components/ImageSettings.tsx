@@ -18,8 +18,8 @@ export function ImageSettings({
   return (
     <>
       {/* Выбор соотношения сторон */}
-      <div className="flex gap-2 mb-4">
-        <span className="text-sm text-gray-400 self-center mr-2">Соотношение сторон:</span>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Соотношение сторон:</span>
         {[
           { value: '1:1', label: '1:1 (Квадрат)' },
           { value: '3:4', label: '3:4 (Портрет)' },
@@ -42,8 +42,8 @@ export function ImageSettings({
       </div>
 
       {/* Выбор модели Imagen */}
-      <div className="flex gap-2 mb-4">
-        <span className="text-sm text-gray-400 self-center mr-2">Модель Imagen:</span>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Модель Imagen:</span>
         {[
           { value: 'imagen-4.0-generate-001', label: 'Imagen 4 Standard' },
           { value: 'imagen-4.0-ultra-generate-001', label: 'Imagen 4 Ultra' },
@@ -66,8 +66,8 @@ export function ImageSettings({
 
       {/* Выбор размера изображения - только для Standard и Ultra */}
       {(imagenModel === 'imagen-4.0-generate-001' || imagenModel === 'imagen-4.0-ultra-generate-001') && (
-        <div className="flex gap-2 mb-4">
-          <span className="text-sm text-gray-400 self-center mr-2">Размер изображения:</span>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <span className="text-sm text-gray-400 self-center mr-2 w-full md:w-auto">Размер изображения:</span>
           {[
             { value: '1K', label: '1K (1024x1024)' },
             { value: '2K', label: '2K (2048x2048)' }

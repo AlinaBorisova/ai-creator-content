@@ -108,22 +108,22 @@ export function ResearchResults({
 
           {/* HTML режим: кнопка слева + preview + выдвижной блок с кодом */}
           <div className="w-full result-container">
-            <div className="relative flex">
+            <div className="relative flex flex-col md:flex-row gap-2">
               {/* Кнопка для показа/скрытия кода слева */}
               <button
                 onClick={() => onToggleCodePanel(i)}
-                className={`flex-shrink-0 w-12 h-12 mr-2 rounded-lg bg-(--background-color) border border-gray-700 hover:border-(--btn-hover-border) border border-gray-700 text-gray-300 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 ${openCodePanels[i] ? 'bg-blue-600 hover:bg-blue-700 hidden' : ''
+                className={`flex-shrink-0 w-auto md:w-12 h-8 md:h-12 mb-1 md:mb-0 md:mr-2 rounded-lg bg-(--background-color) border border-gray-700 hover:border-(--btn-hover-border) text-gray-300 flex flex-row md:flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 px-3 md:px-0 ${openCodePanels[i] ? 'bg-blue-600 hover:bg-blue-700 hidden' : ''
                   }`}
                 title={openCodePanels[i] ? 'Скрыть код' : 'Показать код'}
               >
-                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 md:w-6 md:h-6 md:mb-1 mr-1.5 md:mr-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                 </svg>
                 <span className="text-xs">Code</span>
               </button>
 
               {/* Контейнер для preview и кода */}
-              <div className="flex-1 flex">
+              <div className="flex-1 flex flex-col md:flex-row">
                 {/* Блок с кодом */}
                 <div className={`bg-(--background-color) border-r border-gray-700 transition-all duration-300 ease-in-out overflow-y-auto code-column ${openCodePanels[i]
                   ? 'w-1/2 opacity-100 translate-x-0'
@@ -177,8 +177,8 @@ export function ResearchResults({
 
                 {/* Preview */}
                 <div className={`bg-white border border-gray-700 transition-all duration-300 preview-column ${openCodePanels[i]
-                  ? 'w-1/2 rounded-l-none'
-                  : 'w-full rounded-l'
+                  ? 'w-full md:w-1/2 rounded-t-none md:rounded-l-none rounded-b-lg'
+                  : 'w-full rounded-lg md:rounded-l'
                   }`}>
                   {s.text && s.status !== 'error' ? (
                     (() => {
@@ -291,7 +291,7 @@ export function ResearchResults({
           )}
 
           {/* Кнопки управления */}
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onToggleEdit(i)}
