@@ -4,14 +4,22 @@ import { verifyToken } from '@/lib/auth/tokenVerification';
 import { getCachedToken } from '@/lib/tokenCache';
 
 export async function middleware(request: NextRequest) {
+  // Получаем токен из cookies или заголовка
   const token = request.cookies.get('authToken')?.value ||
     request.headers.get('authorization')?.replace('Bearer ', '');
+
+  console.log('Middleware check:', {
+    path: request.nextUrl.pathname,
+    hasToken: !!token,
+    cookies: request.cookies.getAll().map(c => c.name),
+  });
 
   // Защищаем страницы /ai и /parser
   if (request.nextUrl.pathname.startsWith('/ai') ||
     request.nextUrl.pathname.startsWith('/parser')) {
 
     if (!token) {
+      console.log('Redirecting: no token found');
       return NextResponse.redirect(new URL('/', request.url));
     }
 
@@ -22,6 +30,7 @@ export async function middleware(request: NextRequest) {
     if (cached) {
       // Если токен в кэше и невалиден - редирект
       if (!cached.valid) {
+        console.log('Redirecting: token invalid in cache');
         return NextResponse.redirect(new URL('/', request.url));
       }
       // Если токен валиден в кэше - пропускаем
@@ -41,6 +50,7 @@ export async function middleware(request: NextRequest) {
       }
 
       // Для других ошибок - редирект
+      console.log('Redirecting: token verification failed', verification.error);
       return NextResponse.redirect(new URL('/', request.url));
     }
 

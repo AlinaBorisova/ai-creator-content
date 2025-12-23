@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
@@ -14,6 +15,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +37,11 @@ export default function HomePage() {
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Cookie устанавливается сервером через API, но добавляем клиентскую установку как fallback
-        // Используем lax вместо strict для лучшей совместимости с Vercel
-        const isSecure = process.env.NODE_ENV === 'production';
-        document.cookie = `authToken=${token}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=lax`;
+        // Cookie устанавливается сервером через API
+        // Добавляем небольшую задержку для гарантии установки cookie
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // Проверяем, что cookie установлен (для отладки)
+        console.log('Cookie after login:', document.cookie);
       } else {
         setError(data.error || 'Invalid token');
       }
@@ -59,12 +62,42 @@ export default function HomePage() {
     document.cookie = 'authToken=; path=/; max-age=0; samesite=lax';
   };
 
+  // Обработчик навигации с проверкой cookie
+  const handleNavigation = async (path: string) => {
+    const savedToken = localStorage.getItem('authToken');
+    if (!savedToken) {
+      setError('Please login first');
+      return;
+    }
+
+    // Убеждаемся, что cookie установлен перед навигацией
+    // Это важно для Vercel, где cookie может не установиться сразу
+    const cookieExists = document.cookie.includes('authToken=');
+    if (!cookieExists) {
+      // Если cookie нет, устанавливаем его вручную
+      const isSecure = process.env.NODE_ENV === 'production';
+      document.cookie = `authToken=${savedToken}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=lax`;
+      // Ждем установки cookie
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    router.push(path);
+  };
+
+
   useEffect(() => {
     const savedToken = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
+
+      // Убеждаемся, что cookie установлен при загрузке страницы
+      const cookieExists = document.cookie.includes('authToken=');
+      if (!cookieExists) {
+        const isSecure = process.env.NODE_ENV === 'production';
+        document.cookie = `authToken=${savedToken}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=lax`;
+      }
     }
   }, []);
 
@@ -75,18 +108,18 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold mb-4">Welcome, {user.name || 'User'}!</h1>
           <p className="text-gray-400 mb-6">Choose service</p>
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <Link 
-              href="/parser"
-              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer block"
+            <button
+              onClick={() => handleNavigation('/parser')}
+              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer"
             >
               <h2 className="text-2xl font-bold">TG Parser</h2>
-            </Link>
-            <Link 
-              href="/ai"
-              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer block"
+            </button>
+            <button
+              onClick={() => handleNavigation('/ai')}
+              className="border border-gray-700 p-4 rounded-2xl text-center transition-colors hover:border-(--btn-hover-border) cursor-pointer"
             >
               <h2 className="text-2xl font-bold">AI Text</h2>
-            </Link>
+            </button>
           </div>
           <button
             onClick={handleLogout}

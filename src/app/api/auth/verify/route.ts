@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Валидация входных данных
     const validation = await validateRequest(verifyTokenRequestSchema, body);
-    
+
     if (!validation.success) {
       return validation.response;
     }
@@ -66,17 +66,18 @@ export async function POST(request: NextRequest) {
     });
 
     // Устанавливаем cookie на сервере для работы на Vercel
-    // Определяем, нужно ли использовать secure (только для HTTPS)
+    // Используем встроенный метод Next.js для правильной установки cookie
     const isProduction = process.env.NODE_ENV === 'production';
-    const cookieOptions = [
-      `authToken=${token}`,
-      'path=/',
-      'max-age=31536000', // 1 год
-      isProduction ? 'secure' : '',
-      'samesite=lax', // lax для лучшей совместимости с Vercel
-    ].filter(Boolean).join('; ');
 
-    response.headers.set('Set-Cookie', cookieOptions);
+    response.cookies.set({
+      name: 'authToken',
+      value: token,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1 год в секундах
+      httpOnly: false, // Нужно для доступа из JavaScript (для fallback)
+      secure: isProduction, // Только для HTTPS в production
+      sameSite: 'lax', // lax для лучшей совместимости с Vercel
+    });
 
     return response;
   } catch (error) {
