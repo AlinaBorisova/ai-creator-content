@@ -1,20 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import {
+  historyGetQuerySchema,
+  historyPostRequestSchema
+} from '@/lib/validations/schemas';
+import {
+  validateRequest,
+  validateData,
+  createValidationErrorResponse
+} from '@/lib/validations/validator';
 
 // GET - получить историю пользователя
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-    const mode = searchParams.get('mode');
-    const model = searchParams.get('model');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100); // Максимум 100
-    const skip = (page - 1) * limit;
+    
+    // Преобразуем searchParams в объект для валидации
+    const queryParams = {
+      userId: searchParams.get('userId') || undefined,
+      mode: searchParams.get('mode') || undefined,
+      model: searchParams.get('model') || undefined,
+      page: searchParams.get('page') || '1',
+      limit: searchParams.get('limit') || '50'
+    };
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 });
+    // Валидация query параметров
+    const validation = validateData(historyGetQuerySchema, queryParams);
+    
+    if (!validation.success) {
+      return createValidationErrorResponse(validation.error);
     }
+
+    const { userId, mode, model, page, limit } = validation.data;
+    const skip = (page - 1) * limit;
 
     const whereClause = {
       userId,
@@ -66,11 +84,25 @@ export async function GET(request: NextRequest) {
 // POST - сохранить запись в историю
 export async function POST(request: NextRequest) {
   try {
-    const { userId, prompt, mode, model, results } = await request.json();
-
-    if (!userId || !prompt || !mode) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
+
+    // Валидация входных данных
+    const validation = await validateRequest(historyPostRequestSchema, body);
+    
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { userId, prompt, mode, model, results } = validation.data;
 
     const historyItem = await prisma.apiHistory.create({
       data: {

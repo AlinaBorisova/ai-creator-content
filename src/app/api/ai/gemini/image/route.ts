@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { geminiImageRequestSchema } from '@/lib/validations/schemas';
+import { validateRequest } from '@/lib/validations/validator';
 
 // Функции для определения языка и перевода (можно скопировать из imagen/route.ts)
 export function detectLanguage(text: string): 'ru' | 'en' {
@@ -71,12 +73,25 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Gemini Image API endpoint called');
 
-    const body = await request.json();
-    const { prompt, aspectRatio = '1:1', resolution = '1K' } = body;
-
-    if (!prompt) {
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
+
+    // Валидация входных данных
+    const validation = await validateRequest(geminiImageRequestSchema, body);
+    
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { prompt, aspectRatio, resolution } = validation.data;
 
     const apiKey = process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {

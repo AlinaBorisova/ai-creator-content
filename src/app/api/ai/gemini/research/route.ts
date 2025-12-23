@@ -1,19 +1,37 @@
 import { NextRequest } from 'next/server';
 import { streamTextViaGeminiWithSearch, GeminiModelVersion } from '@/lib/gemini';
+import { geminiResearchRequestSchema } from '@/lib/validations/schemas';
+import { validateRequest } from '@/lib/validations/validator';
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt, modelVersion = 'gemini-2.5-pro' } = await request.json();
-
-    if (!prompt || typeof prompt !== 'string') {
-      return new Response('Invalid prompt', { status: 400 });
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // Валидация версии модели
-    const validModelVersion: GeminiModelVersion =
-      (modelVersion === 'gemini-3-pro-preview' || modelVersion === 'gemini-2.5-pro')
-        ? modelVersion
-        : 'gemini-2.5-pro';
+    // Валидация входных данных
+    const validation = await validateRequest(geminiResearchRequestSchema, body);
+    
+    if (!validation.success) {
+      const errorData = await validation.response.json();
+      return new Response(JSON.stringify({
+        error: 'Validation failed',
+        details: errorData
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { prompt, modelVersion } = validation.data;
+    const validModelVersion: GeminiModelVersion = modelVersion;
 
     console.log('🔍 API Route: Starting research generation for prompt:', prompt.slice(0, 50));
     console.log('📌 Using model:', validModelVersion);

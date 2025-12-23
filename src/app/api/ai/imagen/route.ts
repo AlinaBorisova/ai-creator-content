@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { imagenRequestSchema } from '@/lib/validations/schemas';
+import { validateRequest } from '@/lib/validations/validator';
 
 // Функция для определения языка текста
 export function detectLanguage(text: string): 'ru' | 'en' {
@@ -152,15 +154,26 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Imagen API endpoint called');
 
-    const body = await request.json();
-    console.log('📝 Request body:', body);
-
-    const { prompt, numberOfImages = 1, imageSize = '1K', aspectRatio = '1:1', modelVersion = 'imagen-4.0-generate-001' } = body;
-
-    if (!prompt) {
-      console.error('❌ No prompt provided');
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+      console.log('📝 Request body:', body);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
+
+    // Валидация входных данных
+    const validation = await validateRequest(imagenRequestSchema, body);
+    
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { prompt, numberOfImages, imageSize, aspectRatio, modelVersion } = validation.data;
 
     console.log('🎨 Image generation parameters:', {
       prompt: prompt.slice(0, 50) + '...',

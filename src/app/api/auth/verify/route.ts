@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCachedToken, setCachedToken } from '@/lib/tokenCache';
+import { verifyTokenRequestSchema } from '@/lib/validations/schemas';
+import { validateRequest } from '@/lib/validations/validator';
 
 export async function POST(request: NextRequest) {
   try {
-    const { token } = await request.json();
-
-    if (!token) {
-      return NextResponse.json({ error: 'Token required' }, { status: 400 });
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
+
+    // Валидация входных данных
+    const validation = await validateRequest(verifyTokenRequestSchema, body);
+    
+    if (!validation.success) {
+      return validation.response;
+    }
+
+    const { token } = validation.data;
 
     // Проверяем кэш сначала - это снижает нагрузку на БД
     const cached = getCachedToken(token);

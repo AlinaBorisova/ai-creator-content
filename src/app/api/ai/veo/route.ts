@@ -1,26 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { detectLanguage, hasPeopleInPrompt, translateToEnglish, addSlavicPrompts } from '@/app/api/ai/imagen/route';
+import { veoRequestSchema } from '@/lib/validations/schemas';
+import { validateRequest } from '@/lib/validations/validator';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🎬 Veo API endpoint called');
 
-    const body = await request.json();
-    console.log('📝 Request body:', body);
+    // Парсим и валидируем тело запроса
+    let body: unknown;
+    try {
+      body = await request.json();
+      console.log('📝 Request body:', body);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
+    // Валидация входных данных
+    const validation = await validateRequest(veoRequestSchema, body);
+    
+    if (!validation.success) {
+      return validation.response;
+    }
 
     const {
       prompt,
-      referenceImages = [],
-      modelVersion = 'veo-2.0-generate-001',
-      durationSeconds = '8',
-      aspectRatio = '16:9',
-      resolution = '720p'
-    } = body;
-
-    if (!prompt) {
-      console.error('❌ No prompt provided');
-      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
-    }
+      referenceImages,
+      modelVersion,
+      durationSeconds,
+      aspectRatio,
+      resolution
+    } = validation.data;
 
     const apiKey = process.env.GOOGLE_AI_API_KEY;
     if (!apiKey) {
