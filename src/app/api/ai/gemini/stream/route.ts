@@ -2,9 +2,22 @@ import { NextRequest } from 'next/server';
 import { streamTextViaGeminiDirect, GeminiModelVersion } from '@/lib/gemini';
 import { geminiStreamRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AI_GENERATION');
+    if (rateLimitResponse) {
+      const errorData = await rateLimitResponse.json();
+      return new Response(JSON.stringify(errorData), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          ...Object.fromEntries(rateLimitResponse.headers.entries()),
+        },
+      });
+    }
     // Парсим и валидируем тело запроса
     let body: unknown;
     try {

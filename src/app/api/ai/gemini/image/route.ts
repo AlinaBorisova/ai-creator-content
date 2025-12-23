@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { geminiImageRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 // Функции для определения языка и перевода (можно скопировать из imagen/route.ts)
 export function detectLanguage(text: string): 'ru' | 'en' {
@@ -72,6 +73,12 @@ const getResolutionForAspectRatio = (aspectRatio: string, resolution: '1K' | '2K
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Gemini Image API endpoint called');
+
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AI_IMAGE');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
 
     // Парсим и валидируем тело запроса
     let body: unknown;

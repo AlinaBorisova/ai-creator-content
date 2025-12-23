@@ -9,10 +9,16 @@ import {
   validateData,
   createValidationErrorResponse
 } from '@/lib/validations/validator';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 // GET - получить историю пользователя
 export async function GET(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'HISTORY');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { searchParams } = new URL(request.url);
     
     // Преобразуем searchParams в объект для валидации
@@ -84,6 +90,11 @@ export async function GET(request: NextRequest) {
 // POST - сохранить запись в историю
 export async function POST(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'HISTORY');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     // Парсим и валидируем тело запроса
     let body: unknown;
     try {

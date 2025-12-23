@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { streamTextViaGeminiDirect, GeminiModelVersion } from '@/lib/gemini';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AI_SEO_ARTICLE');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { prompt, topic, searchQuery, modelVersion = 'gemini-2.5-pro' } = await request.json();
 
     if (!prompt || typeof prompt !== 'string') {

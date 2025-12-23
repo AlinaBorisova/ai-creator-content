@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { imagenRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 // Функция для определения языка текста
 export function detectLanguage(text: string): 'ru' | 'en' {
@@ -153,6 +154,12 @@ export function addSlavicPrompts(text: string): string {
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Imagen API endpoint called');
+
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AI_IMAGE');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
 
     // Парсим и валидируем тело запроса
     let body: unknown;

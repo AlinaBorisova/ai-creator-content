@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'HISTORY');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const mode = searchParams.get('mode');

@@ -2,10 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { detectLanguage, hasPeopleInPrompt, translateToEnglish, addSlavicPrompts } from '@/app/api/ai/imagen/route';
 import { veoRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🎬 Veo API endpoint called');
+
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AI_VIDEO');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
 
     // Парсим и валидируем тело запроса
     let body: unknown;

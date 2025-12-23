@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTokenRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
 import { verifyToken } from '@/lib/auth/tokenVerification';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'AUTH');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     // Парсим и валидируем тело запроса
     let body: unknown;
     try {

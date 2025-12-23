@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 export async function POST(request: NextRequest) {
   try {
+    // Проверка rate limit (более мягкий лимит для polling)
+    const rateLimitResponse = await applyRateLimit(request, 'AI_STATUS');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { operation } = await request.json();
 
     if (!operation) {

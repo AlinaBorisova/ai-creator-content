@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
 // GET - получить один элемент истории с результатами
 export async function GET(
@@ -7,6 +8,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'HISTORY');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { id } = await params;
     
     const historyItem = await prisma.apiHistory.findUnique({
@@ -30,6 +36,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Проверка rate limit
+    const rateLimitResponse = await applyRateLimit(request, 'HISTORY');
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
     const { id } = await params;
     
     await prisma.apiHistory.delete({
