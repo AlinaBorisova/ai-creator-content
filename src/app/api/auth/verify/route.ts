@@ -59,10 +59,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    // Создаем ответ с установкой cookie
+    const response = NextResponse.json({
       valid: true,
       user: verification.user,
     });
+
+    // Устанавливаем cookie на сервере для работы на Vercel
+    // Определяем, нужно ли использовать secure (только для HTTPS)
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = [
+      `authToken=${token}`,
+      'path=/',
+      'max-age=31536000', // 1 год
+      isProduction ? 'secure' : '',
+      'samesite=lax', // lax для лучшей совместимости с Vercel
+    ].filter(Boolean).join('; ');
+
+    response.headers.set('Set-Cookie', cookieOptions);
+
+    return response;
   } catch (error) {
     console.error('Error verifying token:', error);
 

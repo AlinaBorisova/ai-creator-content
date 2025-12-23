@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
@@ -25,7 +24,8 @@ export default function HomePage() {
       const response = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token }),
+        credentials: 'include', // Важно для работы с cookies на Vercel
       });
 
       const data = await response.json();
@@ -35,10 +35,10 @@ export default function HomePage() {
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Сохранить токен в cookies для middleware
-        // Убираем secure для localhost, добавляем для production
+        // Cookie устанавливается сервером через API, но добавляем клиентскую установку как fallback
+        // Используем lax вместо strict для лучшей совместимости с Vercel
         const isSecure = process.env.NODE_ENV === 'production';
-        document.cookie = `authToken=${token}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=strict`;
+        document.cookie = `authToken=${token}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=lax`;
       } else {
         setError(data.error || 'Invalid token');
       }
@@ -56,7 +56,7 @@ export default function HomePage() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     // Удаляем cookie
-    document.cookie = 'authToken=; path=/; max-age=0';
+    document.cookie = 'authToken=; path=/; max-age=0; samesite=lax';
   };
 
   useEffect(() => {
