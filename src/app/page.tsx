@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -27,7 +25,7 @@ export default function HomePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
-        credentials: 'include', // Важно для работы с cookies на Vercel
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -40,8 +38,10 @@ export default function HomePage() {
         // Cookie устанавливается сервером через API
         // Добавляем небольшую задержку для гарантии установки cookie
         await new Promise(resolve => setTimeout(resolve, 200));
-        // Проверяем, что cookie установлен (для отладки)
-        console.log('Cookie after login:', document.cookie);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Cookie after login:', document.cookie);
+        }
       } else {
         setError(data.error || 'Invalid token');
       }
@@ -58,11 +58,10 @@ export default function HomePage() {
     setToken('');
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
-    // Удаляем cookie
     document.cookie = 'authToken=; path=/; max-age=0; samesite=lax';
   };
 
-  // Обработчик навигации с проверкой cookie
+  // Обработчик навигации с отправкой токена через заголовок
   const handleNavigation = async (path: string) => {
     const savedToken = localStorage.getItem('authToken');
     if (!savedToken) {
@@ -71,19 +70,40 @@ export default function HomePage() {
     }
 
     // Убеждаемся, что cookie установлен перед навигацией
-    // Это важно для Vercel, где cookie может не установиться сразу
     const cookieExists = document.cookie.includes('authToken=');
     if (!cookieExists) {
-      // Если cookie нет, устанавливаем его вручную
       const isSecure = process.env.NODE_ENV === 'production';
       document.cookie = `authToken=${savedToken}; path=/; max-age=31536000; ${isSecure ? 'secure;' : ''} samesite=lax`;
-      // Ждем установки cookie
       await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Используем window.location для навигации с заголовками
+    // Но так как мы не можем установить заголовки для обычной навигации,
+    // используем router.push и полагаемся на cookie
+    // Если cookie не работает, middleware попробует получить токен из localStorage через специальный endpoint
+    
+    // Альтернативный подход: делаем запрос к API для проверки и установки cookie
+    try {
+      const checkResponse = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${savedToken}`
+        },
+        body: JSON.stringify({ token: savedToken }),
+        credentials: 'include',
+      });
+      
+      if (checkResponse.ok) {
+        // Cookie должен быть установлен через API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    } catch (err) {
+      console.error('Token check failed:', err);
     }
 
     router.push(path);
   };
-
 
   useEffect(() => {
     const savedToken = localStorage.getItem('authToken');
