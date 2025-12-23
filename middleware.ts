@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth/tokenVerification';
 import { getCachedToken } from '@/lib/tokenCache';
 
 export async function middleware(request: NextRequest) {
@@ -9,16 +8,16 @@ export async function middleware(request: NextRequest) {
   const headerToken = request.headers.get('authorization')?.replace('Bearer ', '');
   const token = cookieToken || headerToken;
 
-  // Логирование только в development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Middleware check:', {
-      path: request.nextUrl.pathname,
-      hasCookieToken: !!cookieToken,
-      hasHeaderToken: !!headerToken,
-      hasToken: !!token,
-      cookies: request.cookies.getAll().map(c => c.name),
-    });
-  }
+  // ВРЕМЕННОЕ логирование для отладки на Vercel
+  console.log('[Middleware]', {
+    path: request.nextUrl.pathname,
+    search: request.nextUrl.search,
+    fullPath: request.nextUrl.pathname + request.nextUrl.search,
+    hasCookieToken: !!cookieToken,
+    hasHeaderToken: !!headerToken,
+    hasToken: !!token,
+    cookies: request.cookies.getAll().map(c => `${c.name}=${c.value.substring(0, 10)}...`),
+  });
 
   // Защищаем страницы /ai и /parser
   if (request.nextUrl.pathname.startsWith('/ai') ||
@@ -31,8 +30,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // Проверяем валидность токена
-    // Сначала проверяем кэш для быстрой проверки
+    // В middleware используем ТОЛЬКО кэш для проверки
+    // Это необходимо, так как Prisma не работает в Edge Runtime
     const cached = getCachedToken(token);
 
     if (cached) {
@@ -47,47 +46,33 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Если токена нет в кэше, проверяем в БД
-    // В middleware используем кэш для оптимизации
-    const verification = await verifyToken(token, true);
-
-    if (!verification.valid) {
-      // Для ошибок квоты БД разрешаем доступ (временная проблема)
-      // Пользователь сможет использовать кэшированные данные
-      if (verification.error === 'QUOTA_EXCEEDED') {
-        console.warn('Database quota exceeded in middleware, allowing access with cached data');
-        return NextResponse.next();
-      }
-
-      // Для других ошибок - редирект
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Redirecting: token verification failed', verification.error);
-      }
-      return NextResponse.redirect(new URL('/', request.url));
+    // Если токена нет в кэше, пропускаем запрос
+    // Полная проверка будет выполнена на уровне страницы через API
+    // Это позволяет избежать ошибок Prisma в Edge Runtime
+    // В production на Vercel это нормально, так как кэш должен быть заполнен
+    // после первого успешного логина через API
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Token not in cache, allowing access (will be verified on page level)');
     }
-
-    // Токен валиден - пропускаем запрос
-    // Также устанавливаем cookie для последующих запросов
-    const response = NextResponse.next();
-    if (!cookieToken && token) {
-      // Устанавливаем cookie, если его нет, но токен валиден
-      const isProduction = process.env.NODE_ENV === 'production';
-      response.cookies.set({
-        name: 'authToken',
-        value: token,
-        path: '/',
-        maxAge: 60 * 60 * 24 * 365,
-        httpOnly: false,
-        secure: isProduction,
-        sameSite: 'lax',
-      });
-    }
-    return response;
+    
+    // Пропускаем запрос - проверка будет на уровне страницы
+    // Если токен невалиден, страница сама сделает редирект
+    return NextResponse.next();
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/ai/:path*', '/parser/:path*']
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Это нужно для перехвата RSC запросов с query параметрами (?_rsc=...)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

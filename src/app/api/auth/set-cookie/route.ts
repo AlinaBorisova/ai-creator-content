@@ -25,8 +25,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Устанавливаем cookie
+    // Для Vercel всегда используем secure, так как там всегда HTTPS
     const response = NextResponse.json({ success: true });
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.VERCEL_ENV === 'production' || 
+                        process.env.NODE_ENV === 'production';
+    const isSecure = process.env.VERCEL === '1' || isProduction;
 
     response.cookies.set({
       name: 'authToken',
@@ -34,7 +37,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 365,
       httpOnly: false,
-      secure: isProduction,
+      secure: isSecure,
       sameSite: 'lax',
     });
 

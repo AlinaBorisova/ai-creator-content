@@ -66,8 +66,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Устанавливаем cookie на сервере для работы на Vercel
-    // Используем встроенный метод Next.js для правильной установки cookie
-    const isProduction = process.env.NODE_ENV === 'production';
+    // Определяем production по наличию VERCEL_ENV или проверке URL
+    // Для Vercel всегда используем secure, так как там всегда HTTPS
+    const isProduction = process.env.VERCEL_ENV === 'production' || 
+                        process.env.NODE_ENV === 'production';
+    const isSecure = process.env.VERCEL === '1' || isProduction;
 
     response.cookies.set({
       name: 'authToken',
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 365, // 1 год в секундах
       httpOnly: false, // Нужно для доступа из JavaScript (для fallback)
-      secure: isProduction, // Только для HTTPS в production
+      secure: isSecure, // Всегда true на Vercel
       sameSite: 'lax', // lax для лучшей совместимости с Vercel
     });
 
