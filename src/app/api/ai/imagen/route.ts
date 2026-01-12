@@ -269,7 +269,13 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log('📤 Sending request to Imagen API:', JSON.stringify(requestBody, null, 2));
+    console.log('📤 Sending request to Imagen API:', {
+      model: modelVersion,
+      aspectRatio: aspectRatio,
+      imageSize: imageSize,
+      numberOfImages: numberOfImages,
+      fullRequest: JSON.stringify(requestBody, null, 2)
+    });
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelVersion}:predict`,

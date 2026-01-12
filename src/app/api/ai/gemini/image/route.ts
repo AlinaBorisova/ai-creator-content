@@ -127,7 +127,10 @@ export async function POST(request: NextRequest) {
       }],
       generationConfig: {
         responseModalities: ['IMAGE'],
-        // Для Nano Banana PRO можно указать разрешение через параметры
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: resolution
+        }
       }
     };
 
@@ -136,7 +139,8 @@ export async function POST(request: NextRequest) {
       aspectRatio,
       resolution,
       width,
-      height
+      height,
+      imageConfig: requestBody.generationConfig.imageConfig
     });
 
     const response = await fetch(
