@@ -1,28 +1,36 @@
 import { VertexAI, GenerateContentRequest, Tool } from '@google-cloud/vertexai';
 import { GroundingMetadata } from '@/types/stream';
 
-// Инициализация клиента Vertex AI
-const project = process.env.GOOGLE_CLOUD_PROJECT_ID;
-const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-const client_email = process.env.GOOGLE_CLOUD_CLIENT_EMAIL;
-const private_key = process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-if (!project || !client_email || !private_key) {
-  console.warn('⚠️ Отсутствуют ключи Google Cloud Vertex AI в файле .env!');
-}
-
-const vertexAI = new VertexAI({
-  project: project as string,
-  location: location,
-  googleAuthOptions: {
-    credentials: {
-      client_email,
-      private_key,
-    }
-  }
-});
-
 export type GeminiModelVersion = 'gemini-2.5-pro' | 'gemini-2.5-flash';
+
+// Прячем инстанс в переменную, чтобы не создавать его каждый раз заново
+let vertexAiInstance: VertexAI | null = null;
+
+// Эта функция вызовется только при реальном запросе, а не во время сборки Vercel
+function getVertexAI(): VertexAI {
+  if (!vertexAiInstance) {
+    const project = process.env.GOOGLE_CLOUD_PROJECT_ID;
+    const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+    const client_email = process.env.GOOGLE_CLOUD_CLIENT_EMAIL;
+    const private_key = process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (!project || !client_email || !private_key) {
+      console.warn('⚠️ Отсутствуют ключи Google Cloud Vertex AI в файле .env!');
+    }
+
+    vertexAiInstance = new VertexAI({
+      project: project as string,
+      location: location,
+      googleAuthOptions: {
+        credentials: {
+          client_email,
+          private_key,
+        }
+      }
+    });
+  }
+  return vertexAiInstance;
+}
 
 export async function streamTextViaGeminiDirect(
   prompt: string,
@@ -38,6 +46,9 @@ export async function streamTextViaGeminiDirect(
   try {
     console.log('🚀 Starting Vertex AI generation for prompt:', cleaned.slice(0, 50));
     console.log('📌 Using model:', modelVersion);
+
+    // ПОЛУЧАЕМ КЛИЕНТА ЗДЕСЬ
+    const vertexAI = getVertexAI();
 
     const generativeModel = vertexAI.getGenerativeModel({
       model: modelVersion,
@@ -103,6 +114,9 @@ export async function streamTextViaGeminiWithSearch(
   try {
     console.log('🔍 Starting Vertex AI generation with Google Search for prompt:', cleaned.slice(0, 50));
     console.log('📌 Using model:', modelVersion);
+
+    // ПОЛУЧАЕМ КЛИЕНТА ЗДЕСЬ
+    const vertexAI = getVertexAI();
 
     const generativeModel = vertexAI.getGenerativeModel({
       model: modelVersion,
