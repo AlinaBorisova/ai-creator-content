@@ -265,7 +265,8 @@ export function useImageGeneration() {
               body: JSON.stringify({
                 prompt: promptText,
                 aspectRatio: aspectRatio,
-                resolution: geminiImageResolution
+                resolution: geminiImageResolution,
+                numberOfImages: imageCount,
               }),
               signal: controller.signal
             });

@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleAuth } from 'google-auth-library';
 import { geminiImageRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
 import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
-// Функции для определения языка и перевода (можно скопировать из imagen/route.ts)
+// Google Cloud credentials
+const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
+const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+const client_email = process.env.GOOGLE_CLOUD_CLIENT_EMAIL;
+const private_key = process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+if (!projectId || !client_email || !private_key) {
+  console.warn('⚠️ Отсутствуют ключи Google Cloud Vertex AI в файле .env!');
+}
+
+// Функции для определения языка и перевода
 export function detectLanguage(text: string): 'ru' | 'en' {
   const cyrillicRegex = /[а-яёА-ЯЁ]/;
   const hasCyrillic = cyrillicRegex.test(text);
@@ -12,39 +24,33 @@ export function detectLanguage(text: string): 'ru' | 'en' {
 
 export async function translateToEnglish(text: string): Promise<string> {
   try {
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) {
-      console.warn('⚠️ No API key for translation, using original text');
+    if (!projectId || !client_email || !private_key) {
+      console.warn('⚠️ No Google Cloud credentials for translation');
       return text;
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Translate the following Russian text to English for image generation. Return ONLY the English translation, nothing else: "${text}"`
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 2000
-          }
-        })
+    const vertexAI = new VertexAI({
+      project: projectId,
+      location: location,
+      googleAuthOptions: {
+        credentials: { client_email, private_key }
       }
-    );
+    });
 
-    if (!response.ok) {
-      return text;
-    }
+    const generativeModel = vertexAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+    const promptText = `Translate the following Russian text to English for image generation. Return ONLY the English translation, nothing else: "${text}"`;
 
-    const data = await response.json();
-    const translation = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const resp = await generativeModel.generateContent({
+      contents: [{ role: 'user', parts: [{ text: promptText }] }],
+      generationConfig: {
+        temperature: 0.1,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2000
+      }
+    });
+
+    const translation = resp.response.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     return translation || text;
   } catch (error) {
     console.error('Translation error:', error);
@@ -98,14 +104,7 @@ export async function POST(request: NextRequest) {
       return validation.response;
     }
 
-    const { prompt, aspectRatio, resolution } = validation.data;
-
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'API key not configured. Please check your .env.local file'
-      }, { status: 500 });
-    }
+    const { prompt, aspectRatio, resolution, numberOfImages } = validation.data;
 
     // Определяем язык и переводим при необходимости
     const language = detectLanguage(prompt);
@@ -120,109 +119,140 @@ export async function POST(request: NextRequest) {
     // Получаем разрешение для выбранного соотношения сторон
     const { width, height } = getResolutionForAspectRatio(aspectRatio, resolution);
 
-    // Формируем запрос к Gemini Image API
-    const requestBody = {
-      contents: [{
-        parts: [{ text: finalPrompt }]
-      }],
-      generationConfig: {
-        responseModalities: ['IMAGE'],
-        imageConfig: {
-          aspectRatio: aspectRatio,
-          imageSize: resolution
-        }
-      }
-    };
-
-    console.log('📤 Sending request to Gemini Image API:', {
-      model: 'gemini-3-pro-image-preview',
+    console.log('📤 Sending request to Vertex AI Gemini Image API:', {
+      model: 'gemini-3-pro-image@001',
       aspectRatio,
       resolution,
       width,
-      height,
-      imageConfig: requestBody.generationConfig.imageConfig
+      height
     });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}`,
-      {
+    // Используем SDK для генерации изображений (как текстовые модели)
+    if (!projectId || !client_email || !private_key) {
+      return NextResponse.json({
+        error: 'Google Cloud credentials not configured in .env'
+      }, { status: 500 });
+    }
+
+    const vertexAI = new VertexAI({
+      project: projectId,
+      location: location,
+      googleAuthOptions: {
+        credentials: { client_email, private_key }
+      }
+    });
+
+    // Используем Imagen для генерации изображений (Gemini image models недоступны)
+    // Gemini модели для текста, Imagen для изображений
+    const auth = new GoogleAuth({
+      credentials: { client_email, private_key },
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+    const client = await auth.getClient();
+    const accessToken = await client.getAccessToken();
+
+    // Используем Imagen REST API как в других местах
+    const modelVersion = 'imagen-3.0-generate-001';
+    const vertexUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${modelVersion}:predict`;
+
+    const requestBody = {
+      instances: [{ prompt: finalPrompt }],
+      parameters: {
+        sampleCount: numberOfImages,
+        aspectRatio: aspectRatio,
+        personGeneration: 'ALLOW_ADULT'
+      }
+    };
+
+    console.log('📤 Sending request to Vertex Imagen for Nano Banana PRO:', {
+      model: modelVersion,
+      url: vertexUrl
+    });
+
+    try {
+      const resp = await fetch(vertexUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken.token}`,
+          'Content-Type': 'application/json; charset=utf-8',
         },
         body: JSON.stringify(requestBody)
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('❌ Gemini Image API error:', {
-        status: response.status,
-        error: errorData
       });
 
-      let errorMessage = 'Failed to generate images';
-      try {
-        const parsedError = JSON.parse(errorData);
-        if (parsedError.error?.message) {
-          errorMessage = parsedError.error.message;
+      if (!resp.ok) {
+        const errorData = await resp.text();
+        console.error('❌ Imagen API error:', {
+          status: resp.status,
+          error: errorData
+        });
+
+        let errorMessage = 'Failed to generate images';
+        try {
+          const parsedError = JSON.parse(errorData);
+          if (parsedError.error?.message) {
+            errorMessage = parsedError.error.message;
+          }
+        } catch (e) {
+          console.error('Error parsing error response:', e);
         }
-      } catch {
-        // Если не JSON, используем как есть
+
+        return NextResponse.json({
+          error: errorMessage,
+          status: resp.status
+        }, { status: resp.status });
       }
 
-      return NextResponse.json({
-        error: errorMessage,
-        status: response.status
-      }, { status: response.status });
-    }
+      const data = await resp.json();
+      console.log('✅ Imagen API response received');
 
-    const data = await response.json();
-    console.log('✅ Gemini Image API response received');
+      // Извлекаем изображения из ответа
+      const images: Array<{ imageBytes: string; mimeType: string; index: number }> = [];
 
-    // Извлекаем изображения из ответа
-    const images: Array<{ imageBytes: string; mimeType: string; index: number }> = [];
+      const predictions = data.predictions || [];
+      predictions.forEach((prediction: any, index: number) => {
+        if (prediction.bytesBase64Encoded) {
+          images.push({
+            imageBytes: prediction.bytesBase64Encoded,
+            mimeType: prediction.mimeType || 'image/png',
+            index: index + 1
+          });
+        }
+      });
 
-    if (data.candidates && data.candidates.length > 0) {
-      const candidate = data.candidates[0];
-      if (candidate.content && candidate.content.parts) {
-        candidate.content.parts.forEach((part: { inlineData?: { mimeType?: string; data: string } }, index: number) => {
-          if (part.inlineData) {
-            images.push({
-              imageBytes: part.inlineData.data,
-              mimeType: part.inlineData.mimeType || 'image/png',
-              index: index + 1
-            });
-          }
+      if (images.length === 0) {
+        return NextResponse.json({
+          success: true,
+          images: [],
+          message: 'No images were returned'
         });
       }
-    }
 
-    if (images.length === 0) {
+      console.log(`🎉 Successfully processed ${images.length} images`);
+
       return NextResponse.json({
         success: true,
-        images: [],
-        message: 'No images were returned'
+        images: images,
+        count: images.length,
+        translation: {
+          original: prompt,
+          translated: finalPrompt,
+          language: language,
+          wasTranslated: wasTranslated,
+          hasSlavicPrompts: false
+        }
       });
+    } catch (sdkError) {
+      console.error('❌ API Error:', sdkError);
+      throw sdkError;
     }
-
-    console.log(`🎉 Successfully processed ${images.length} images`);
-
-    return NextResponse.json({
-      success: true,
-      images: images,
-      count: images.length,
-      translation: {
-        original: prompt,
-        translated: finalPrompt,
-        language: language,
-        wasTranslated: wasTranslated,
-        hasSlavicPrompts: false
-      }
-    });
 
   } catch (error) {
     console.error('💥 Gemini Image generation error:', error);
+    console.error('❌ Full error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
     return NextResponse.json({
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
