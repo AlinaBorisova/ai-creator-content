@@ -51,8 +51,8 @@ export function ModeSelector({
       <button
         onClick={() => onModeChange('seo-article')}
         className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium cursor-pointer border border-gray-700 transition-all duration-300 hover:scale-105 ${mode === 'seo-article'
-            ? 'bg-(--btn-active-color) text-white'
-            : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+          ? 'bg-(--btn-active-color) text-white'
+          : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
           }`}
       >
         <DocumentIcon className="w-4 h-4" /> SEO Статья
@@ -86,19 +86,22 @@ export function ModeSelector({
           </div>
         )}
       </div>
-      <div className="relative">
-        <button
-          onClick={() => onModeChange('videos')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${mode === 'videos'
-            ? 'bg-(--btn-active-color) text-white'
-            : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
-            }`}
-        >
-          <VideoIcon className="w-4 h-4" /> Видео
-        </button>
+      {/* 🔒 СКРЫТО: Генерация видео (Veo). Логика сохранена для будущего использования */}
+      {false && (
+        <div className="relative">
+          <button
+            onClick={() => onModeChange('videos')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium border border-gray-700 cursor-pointer transition-all duration-300 hover:scale-105 ${mode === 'videos'
+              ? 'bg-(--btn-active-color) text-white'
+              : 'bg-(--btn-color) text-gray-300 hover:border-(--btn-hover-border)'
+              }`}
+          >
+            <VideoIcon className="w-4 h-4" /> Видео
+          </button>
 
 
-      </div>
+        </div>
+      )}
     </div>
   );
 }
