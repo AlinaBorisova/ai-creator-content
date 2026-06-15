@@ -9,7 +9,7 @@ export const resolutionSchema = z.enum(['1K', '2K', '4K']);
 
 export const geminiModelVersionSchema = z.enum([
   'gemini-2.5-pro',
-  'gemini-3-pro-preview'
+  'gemini-2.5-flash'
 ]);
 
 export const imagenModelVersionSchema = z.enum([
@@ -45,6 +45,11 @@ export const geminiImageRequestSchema = z.object({
     .min(5, 'Prompt must be at least 5 characters')
     .max(5000, 'Prompt must not exceed 5000 characters')
     .trim(),
+  numberOfImages: z.coerce.number()
+    .int('Number of images must be an integer')
+    .min(1, 'At least 1 image is required')
+    .max(4, 'Maximum 4 images allowed')
+    .default(1),
   aspectRatio: aspectRatioSchema.default('1:1'),
   resolution: resolutionSchema.default('1K')
 });

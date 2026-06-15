@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 
-export type GeminiModelVersion = 'gemini-2.5-pro' | 'gemini-3-pro-preview';
+export type GeminiModelVersion = 'gemini-2.5-pro' | 'gemini-2.5-flash';
 
 interface GeminiModelSelectorProps {
   selectedModel: GeminiModelVersion;
@@ -22,12 +22,12 @@ export function GeminiModelSelector({
     {
       value: 'gemini-2.5-pro',
       label: 'Gemini 2.5 Pro',
-      description: 'Быстрая и стабильная модель'
+      description: 'Думающая и стабильная модель'
     },
     {
-      value: 'gemini-3-pro-preview',
-      label: 'Gemini 3 Pro',
-      description: 'Самая продвинутая модель с улучшенным reasoning'
+      value: 'gemini-2.5-flash',
+      label: 'Gemini 2.5 Flash',
+      description: 'Самая быстрая модель'
     }
   ];
 
