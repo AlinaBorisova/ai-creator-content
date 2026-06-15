@@ -113,7 +113,6 @@ export async function streamTextViaGeminiWithSearch(
         maxOutputTokens: 32768
       },
       tools: [
-        // @ts-ignore - игнорируем старую типизацию SDK. API Vertex уже поддерживает googleSearch
         { googleSearch: {} } as Tool
       ]
     });
@@ -124,7 +123,7 @@ export async function streamTextViaGeminiWithSearch(
 
     const streamingResp = await generativeModel.generateContentStream(request);
     let fullText = '';
-    
+
     for await (const item of streamingResp.stream) {
       if (signal?.aborted) {
         throw new Error('Aborted');
@@ -152,8 +151,9 @@ export async function streamTextViaGeminiWithSearch(
 
     // Безопасное извлечение метаданных для TypeScript
     const firstCandidate = aggregatedResponse.candidates?.[0];
-    if (firstCandidate && (firstCandidate as any).groundingMetadata) {
-      groundingMetadata = (firstCandidate as any).groundingMetadata as GroundingMetadata;
+    if (firstCandidate && 'groundingMetadata' in firstCandidate) {
+      const candidateWithMetadata = firstCandidate as unknown as { groundingMetadata: GroundingMetadata };
+      groundingMetadata = candidateWithMetadata.groundingMetadata;
       console.log('🔍 Grounding metadata extracted successfully');
     }
 

@@ -5,6 +5,11 @@ import { geminiImageRequestSchema } from '@/lib/validations/schemas';
 import { validateRequest } from '@/lib/validations/validator';
 import { applyRateLimit } from '@/lib/rateLimit/middleware';
 
+interface ImagePrediction {
+  bytesBase64Encoded: string;
+  mimeType?: string;
+}
+
 // Google Cloud credentials
 const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
@@ -134,14 +139,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    const vertexAI = new VertexAI({
-      project: projectId,
-      location: location,
-      googleAuthOptions: {
-        credentials: { client_email, private_key }
-      }
-    });
-
     // Используем Imagen для генерации изображений (Gemini image models недоступны)
     // Gemini модели для текста, Imagen для изображений
     const auth = new GoogleAuth({
@@ -209,7 +206,7 @@ export async function POST(request: NextRequest) {
       const images: Array<{ imageBytes: string; mimeType: string; index: number }> = [];
 
       const predictions = data.predictions || [];
-      predictions.forEach((prediction: any, index: number) => {
+      predictions.forEach((prediction: ImagePrediction, index: number) => {
         if (prediction.bytesBase64Encoded) {
           images.push({
             imageBytes: prediction.bytesBase64Encoded,

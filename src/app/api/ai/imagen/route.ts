@@ -5,6 +5,11 @@ import { applyRateLimit } from '@/lib/rateLimit/middleware';
 import { VertexAI } from '@google-cloud/vertexai';
 import { GoogleAuth } from 'google-auth-library';
 
+interface ImagePrediction {
+  bytesBase64Encoded: string;
+  mimeType?: string;
+}
+
 // --- Инициализация Google Cloud ---
 const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
 const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
@@ -168,7 +173,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, images: [], message: 'No predictions returned' });
     }
 
-    const images = predictions.map((prediction: any, index: number) => ({
+    const images = predictions.map((prediction: ImagePrediction, index: number) => ({
       imageBytes: prediction.bytesBase64Encoded,
       mimeType: prediction.mimeType || 'image/png',
       index: index + 1
