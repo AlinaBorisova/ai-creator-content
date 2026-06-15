@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // Валидация версии модели
     const validModelVersion: GeminiModelVersion = 
-      (modelVersion === 'gemini-3-pro-preview' || modelVersion === 'gemini-2.5-pro')
+      (modelVersion === 'gemini-2.5-flash' || modelVersion === 'gemini-2.5-pro')
         ? modelVersion
         : 'gemini-2.5-pro';
 
